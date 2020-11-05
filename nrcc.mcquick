@@ -1,0 +1,230 @@
+pack In-game splits for the Nether Reactor Core Challenge!
+icon speedrun
+
+
+namespace minecraft
+tag functions load [nrcc:load]
+tag functions tick [nrcc:tick]
+
+namespace nrcc
+nameglobals NRCCGlobal
+
+define @runner @a[tag=Runner]
+define @armors @e[type=$:armor_stand]
+define @trackers @armors[scores={SplitTracker=1..}]
+
+
+define setPrintMsg data modify storage ~:time_printer PreMsg set value
+enum BAR CHAT TITLE
+
+list Dimensions $:overworld $:the_nether $:the_end
+map DimIDs maps (Dimensions) to [0,1,2]
+map DimNames maps (Dimensions) to [Overworld,Nether,End]
+map DimColors maps (Dimensions) to [green,red,dark_purple]
+
+function load {
+	.scoredef
+	.scoreclr Splits
+	.scoredef Health health
+	# scoreboard objectives setdisplay sidebar Splits
+
+	tag @a remove Runner
+
+	# UI
+	.json startButton {
+		"text": "[Start]",
+		"color": "green",
+		"clickEvent": {
+			"action": "run_command",
+			"value": "/function ~:start"
+		},
+		"hoverEvent": {
+			"action": "show_text",
+			"contents": {
+				"text": "Click to start the run!"
+			}
+		}
+	}
+	tellraw @a (startButton)
+}
+function tick {
+	execute as @runner at @s run .lambda {
+		# Increase timer
+		.score Time.Splits ++
+
+		# Countdown titles
+		.if Time.Splits == -60 run title @s title {"text":"3"}
+		.if Time.Splits == -40 run title @s title {"text":"2"}
+		.if Time.Splits == -20 run title @s title {"text":"1"}
+		.if Time.Splits == 0 run title @s title {"text":"GO!","color":"gold"}
+
+		# in run
+		.if Time.Splits >= 0 run .lambda {
+			# print timer
+			.call print_time Time.Splits (BAR)
+
+			# Dimension check
+			.call check_dim
+			.score Temp = CurrDim
+			.score Temp -= LastDim
+			.unless Temp == 0 run .lambda {
+				.score KnownDim = 0
+				.for Dim in (Dimensions) {
+					.if CurrDim == (DimIDs[(Dim)]) run {
+						(setPrintMsg) "{\"text\": \"The (DimNames[(Dim)])\", \"color\": \"(DimColors[(Dim)])\"}"
+						.score KnownDim = 1
+					}
+				}
+				.if KnownDim == 0 run (setPrintMsg) "{\"text\": \"Custom Dimension\", \"color\": \"gray\"}"
+				.score LastDim = CurrDim
+				.call split
+			}
+			.score Temp reset
+
+			# Item check
+			.if HasCore == 0 {
+				execute if entity @s[nbt={Inventory:[{tag:{core:"nether"}}]}] run .lambda {
+					(setPrintMsg) "{\"text\": \"Core get\"}"
+					.call split
+					.score HasCore = 1
+				}
+			}
+
+			# Activation check
+			.if Activated == 0 {
+				execute if entity @e[type=$:shulker,tag=NetherReactorCore,tag=Active] run .lambda {
+					(setPrintMsg) "{\"text\": \"Activated\"}"
+					.call split
+					.score Activated = 1
+				}
+			}
+
+			# Death check
+			.if Activated == 1 {
+				.if @s.Health == 0 run .lambda {
+					title @s title {"text": "You failed...", "color": "red"}
+					(setPrintMsg) "{\"text\": \"Failed\", \"color\": \"red\"}"
+					.call print_time Time.Splits (CHAT)
+					.call stop
+				}
+			}
+
+			# Finish check
+			execute if entity @e[type=$:shulker,tag=NetherReactorCore,tag=Dead] run .lambda {
+				title @s title {"text": "Time!","color": "gold"}
+				(setPrintMsg) "{\"text\": \"Time!\",\"color\": \"gold\"}"
+				.call print_time Time.Splits (CHAT)
+				.call stop
+			}
+		}
+	}
+}
+
+function start {
+	tag @a remove Runner
+	tag @s add Runner
+
+	effect give @s $:slowness 3 255
+	effect give @s $:mining_fatigue 3 255
+	
+	.scoreclr Splits
+	# scoreboard objectives setdisplay sidebar Splits
+	.score Time.Splits = -61
+	.score SplitCount = 0
+	.call check_dim
+	.score LastDim = CurrDim
+	.score HasCore = 0
+	.score Activated = 0
+	.score WarnLoc.NetherReactorVar = (CHAT)
+}
+
+function stop {
+	tag @a remove Runner
+	.score WarnLoc.NetherReactorVar = (BAR)
+}
+
+function check_dim {
+	.for Dim in (Dimensions) {
+		execute in (Dim) as @p[distance=..0] run .score CurrDim = (DimIDs[(Dim)])
+	}
+}
+
+function split {
+	.score SplitCount ++
+	.range SplitNums 1000
+	.for N in (SplitNums) {
+		.if SplitCount == (N) {
+			.score (N):.Splits = Time.Splits
+		}
+	}
+	.call print_time Time.Splits (CHAT)
+}
+
+function calc_time takes Value {
+	# Get minutes
+	.score Minutes = Value
+	.score Scalar = 1200
+	.score Minutes /= Scalar
+	.score Subtractor = Minutes
+	.score Subtractor *= Scalar
+	.score Value -= Subtractor
+	# Get seconds
+	.score Seconds = Value
+	.score Scalar = 20
+	.score Seconds /= Scalar
+	.score Subtractor = Seconds
+	.score Subtractor *= Scalar
+	.score Value -= Subtractor
+	# Get sub seconds
+	.score Scalar = 5
+	.score Value *= Scalar
+	# cleanup
+	.score Scalar reset
+	.score Subtractor reset
+}
+function print_time takes Value PrintLoc {
+	.do calc_time
+
+	# update suffixes
+	.define store data modify storage ~:time_printer
+	.if Seconds < 10 run (store) SecMark set value ":0"
+	.unless Seconds < 10 run (store) SecMark set value ":"
+	.if Value < 10 run (store) SubSecMark set value ":0"
+	.unless Value < 10 run (store) SubSecMark set value ":"
+	execute if data storage ~:time_printer PreMsg run data modify storage ~:time_printer PreMsgMark set value ": "
+	execute unless data storage ~:time_printer PreMsg run {
+		data modify storage ~:time_printer PreMsgMark set value ""
+		data modify storage ~:time_printer PreMsg set value ""
+	}
+
+	.json timeText {
+		"text": "",
+		"color": "aqua",
+		"extra": [
+			{"storage": "~:time_printer", "nbt": "PreMsg", "interpret": true},
+			{"storage": "~:time_printer", "nbt": "PreMsgMark"},
+			{"score": {
+				"name": "Minutes",
+				"objective": "NRCCGlobal"
+			}},
+			{"storage": "~:time_printer", "nbt": "SecMark"},
+			{"score": {
+				"name": "Seconds",
+				"objective": "NRCCGlobal"
+			}},
+			{"storage": "~:time_printer", "nbt": "SubSecMark"},
+			{"score":{
+				"name": "Value",
+				"objective": "NRCCGlobal"
+			}}
+		]
+	}
+
+	# print
+	.if PrintLoc == (BAR) run title @s actionbar (timeText)
+	.if PrintLoc == (TITLE) run title @s title (timeText)
+	.if PrintLoc == (CHAT) run tellraw @s (timeText)
+
+	# cleanup
+	data remove storage ~:time_printer PreMsg
+}

@@ -1,0 +1,56 @@
+FINDINGS
+
+Blocks and Structure
+	[X] Blocks in regions above main room are preserved
+		(outside of the ones that get replaced by the spire)
+		In other words, the structure does not replace blocks with air, except for in the main room
+
+	[X] Glowing obsidian placement occurs regardless of what block is present
+		Will work if blocks are left as is
+		Will work if blocks are mined
+		Will work if blocks are mined and replaced with something else
+	[X] Glowing obsidian placement steps are precise
+		(only the blocks that visually change in a step are placed, there is no overlap with previously placed glowing obsidian)
+	[X] Glowing obsidian is never replaced after mining it
+		(except by the obsidian during the reactor cooldown)
+
+	Confirmed the bottom two layers of netherrack never decay
+	Confirmed only the walls of the spire decay
+	[X] Any non-netherrack blocks placed in the spire walls will also decay
+	[X] Spire walls do not decay in full rectangles. Only blocks that the spire itself occupied/replaced are decayed
+	[X] Decay chance for a block is 25%
+
+
+	Confirmed core powers down on decay step
+	[X] Obsidian is placed again on decay step
+	
+	[X] Obsidian powerdown moves downwards from the top layer
+	Confirmed powerdown steps to be 860, 880, 900, and deactivation at 920
+
+Items
+	[X] The actual summon times for items are [200,260,400,440,500,600,680,720,760,800]
+	[X] The actual loot table is ["Red Mushroom", "Brown Mushroom", "Cactus", "Nether Quartz", "Pumpkin Seeds", "Sugar Canes", "Glowstone Dust", "Melon Seeds"]
+
+	[X] Glowstone Dust always drops as a stack of 3
+	[X] Nether Quartz always drops as a stack of 4
+	[X] All other items are a single drop
+
+	[X] Items spawn between radii of 3 and 7 blocks away from the reactor core
+
+	Confirmed loot drops are equal weight per item
+	Confirmed exactly 15 spawns occur during first three waves
+
+	[X] During the remaining waves, 0 is the minimum drop, with 37 as a maximum, excluding the outlier of 71
+		It may be reasonable to go with double the avg rate for these as a maximum
+		Averages are [15, 15, 15, 17.32, 20.68, 16.14, 10.32, 11.44, 17.92, 9.9]
+
+Pigmen
+	Confirmed will never spawn past 3 Pigmen
+	Confirmed will only spawn at most two at a time
+	
+	[X] Pigmen will only spawn during the first half of spawn waves [200,260,400,440,500]
+	[X] At times 440 and 500, only 1 Pigman will spawn at max, despite two being spawnable
+	
+	[X] Follow the same spawn radius rules as items
+
+	[X] Don't agro instantly, instead will agro if close enough to player (within 4 blocks)

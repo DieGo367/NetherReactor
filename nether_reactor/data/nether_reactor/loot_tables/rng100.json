@@ -1,0 +1,1 @@
+{"type": "command", "pools": [{"rolls": 1, "entries": [{"type": "minecraft:item", "name": "minecraft:dirt", "functions": [{"function": "minecraft:set_count", "count": {"type": "uniform", "min": 0, "max": 100}}, {"function": "minecraft:set_nbt", "tag": "{\"rng\":true}"}]}]}]}
