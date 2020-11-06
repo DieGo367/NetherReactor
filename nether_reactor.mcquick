@@ -25,6 +25,12 @@ enum BAR CHAT TITLE
 list BlockIDs 1 2 3 4
 list BlockNames core core_active core_dead glowing_obsidian
 map BlockID maps (BlockNames) to (BlockIDs)
+list SourceBlocks $:spawner $:spawner $:spawner $:crying_obsidian
+map SourceBlock maps (BlockNames) to (SourceBlocks)
+list SourceItems $:diamond_ore $:diamond_ore $:diamond_ore $:crying_obsidian
+map SourceItem maps (BlockNames) to (SourceItems)
+list PlaceScores PlacedDiamondOre PlacedDiamondOre PlacedDiamondOre PlacedCryingObs
+map PlaceScore maps (BlockNames) to (PlaceScores)
 list Cores core core_active core_dead
 
 function init {
@@ -36,6 +42,11 @@ function init {
 	# player
 	.scoredef SearchTime
 	.score WarnLoc = (BAR)
+	# block placement
+	.scoredef PlaceSearch
+	.scoredef HeldBlockID
+	.scoredef PlacedDiamondOre minecraft.used:minecraft.diamond_ore
+	.scoredef PlacedCryingObs minecraft.used:minecraft.crying_obsidian
 }
 
 function tick {
@@ -52,6 +63,7 @@ function tick {
 	}
 	
 	# core placement detection
+	.call check_placement
 	execute as @a[nbt={Inventory:[{tag:{core:"nether"}}]}] at @s run .call player/start_search
 	execute as @a[tag=SearchingForCores] at @s run .call player/searching
 
@@ -60,6 +72,16 @@ function tick {
 	
 	# infinite night
 	.if IsInfiniteNight == 1 run .call infinite_night
+}
+
+function check_placement {
+	.for Block in (BlockNames) {
+		execute as @a[nbt={SelectedItem:{id:"(SourceItem[(Block)])",tag:{CustomModelData:(BlockID[(Block)])}}}] at @s run .lambda {
+			.score @s.HeldBlockID = (BlockID[(Block)])
+			.if @s.(PlaceScore[(Block)]) > 0 run .call player/place/(Block)
+			.score @s.(PlaceScore[(Block)]) = 0
+		}
+	}
 }
 
 in core {
@@ -411,6 +433,23 @@ in player {
 		.score @s.SearchTime --
 		.if @s.SearchTime == 0 run tag @s remove SearchingForCores
 	}
+	in place {
+		for Block in (BlockNames) {
+			function (Block) {
+				.score @s.PlaceSearch = 5000
+				execute anchored eyes run .lambda {
+					.score @s.PlaceSearch --
+					execute unless block ~~~ (SourceItem[(Block)]) {
+						.if @s.PlaceSearch == 0 run say ran out..
+						.if @s.PlaceSearch > 0 {
+							execute positioned ^ ^ ^0.01 run .recurse
+						}
+					}
+					execute if block ~~~ (SourceItem[(Block)]) run .call place/(Block)
+				}
+			}
+		}
+	}
 }
 
 # as pigman in main spire room during reaction
@@ -458,23 +497,16 @@ function place {
 }
 
 in place {
-	for Core in (Cores) {
-		function (Core) {
-			setblock ~~~ $:spawner
-			data modify block ~~~ RequiredPlayerRange set value 0
+	for Block in (BlockNames) {
+		function (Block) {
+			setblock ~~~ (SourceBlock[(Block)])
+			execute if block ~~~ $:spawner run data modify block ~~~ RequiredPlayerRange set value 0
 			execute align xyz {
-				summon $:armor_stand ~0.5 ~0.5 ~0.5 {Marker:1,Invisible:1,NoGravity:1,ArmorItems:[{},{},{},{id:"$:diamond_ore",Count:1b,tag:{CustomModelData:(BlockID[(Core)])}}]}
-				tag @nearest[type=armor_stand] add NetherReactorCustomBlock
+				summon $:armor_stand ~0.5 ~0.5 ~0.5 {Marker:1,Invisible:1,NoGravity:1,ArmorItems:[{},{},{},{id:"(SourceItem[(Block)])",Count:1b,tag:{CustomModelData:(BlockID[(Block)])}}],Tags:["NetherReactorCustomBlock"]}
 			}
 		}
 	}
-	function glowing_obsidian {
-		setblock ~~~ $:crying_obsidian
-		execute align xyz {
-			summon $:armor_stand ~0.5 ~0.5 ~0.5 {Marker:1,Invisible:1,NoGravity:1,ArmorItems:[{},{},{},{id:"$:crying_obsidian",Count:1b,tag:{CustomModelData:(BlockID[glowing_obsidian])}}]}
-			tag @nearest[type=armor_stand] add NetherReactorCustomBlock
-		}
-	}
+
 }
 
 in give {
