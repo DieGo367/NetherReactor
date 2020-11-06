@@ -446,6 +446,27 @@ function place {
 	execute as @nearest[type=$:shulker] run .call core/init
 }
 
+function placecore {
+	setblock ~~~ $:spawner
+	data modify block ~~~ RequiredPlayerRange set value 0
+	.json ArmorData {
+		"Marker": true,
+		"Invisible": true,
+		"NoGravity": true,
+		"ArmorItems": [
+			{},{},{},
+			{
+				"id": "$:diamond_ore",
+				"Count": 1,
+				"tag": {
+					"CustomModelData": 1
+				}
+			}
+		]
+	}
+	execute align xyz run summon $:armor_stand ~0.5 ~0.5 ~0.5 (ArmorData)
+}
+
 structure nether_spire
 function spire {
 	setblock ~ ~-3 ~ minecraft:structure_block{mode:"LOAD",powered:0b,name:"~:nether_spire",posX:-8,posZ:-8}
