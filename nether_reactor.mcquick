@@ -17,6 +17,7 @@ define @decayer @item[nbt={Item:{tag:{decayer:1b}}}]
 define @diamonds @item[nbt={Item:{id:"minecraft:diamond",Count:3b}}]
 define @irons @item[nbt={Item:{id:"minecraft:iron_ingot",Count:6b}}]
 define @reactors @e[type=$:shulker,tag=NetherReactorCore]
+define @blocks @e[type=$:armor_stand,tag=NetherReactorCustomBlock]
 
 define setWarnMsg data modify storage ~:warn msg set value
 enum BAR CHAT TITLE
@@ -43,6 +44,11 @@ function tick {
 		execute if block ~ ~-1 ~ minecraft:crafting_table {
 			execute if entity @irons[distance=..1] run .call craft
 		}
+	}
+
+	# block mask deletion
+	execute as @blocks at @s {
+		execute if block ~~~ #~:air run kill @s
 	}
 	
 	# core placement detection
@@ -451,25 +457,24 @@ function place {
 	execute as @nearest[type=$:shulker] run .call core/init
 }
 
-function placecore {
-	setblock ~~~ $:spawner
-	data modify block ~~~ RequiredPlayerRange set value 0
-	.json ArmorData {
-		"Marker": true,
-		"Invisible": true,
-		"NoGravity": true,
-		"ArmorItems": [
-			{},{},{},
-			{
-				"id": "$:diamond_ore",
-				"Count": 1,
-				"tag": {
-					"CustomModelData": 1
-				}
+in place {
+	for Core in (Cores) {
+		function (Core) {
+			setblock ~~~ $:spawner
+			data modify block ~~~ RequiredPlayerRange set value 0
+			execute align xyz {
+				summon $:armor_stand ~0.5 ~0.5 ~0.5 {Marker:1,Invisible:1,NoGravity:1,ArmorItems:[{},{},{},{id:"$:diamond_ore",Count:1b,tag:{CustomModelData:(BlockID[(Core)])}}]}
+				tag @nearest[type=armor_stand] add NetherReactorCustomBlock
 			}
-		]
+		}
 	}
-	execute align xyz run summon $:armor_stand ~0.5 ~0.5 ~0.5 (ArmorData)
+	function glowing_obsidian {
+		setblock ~~~ $:crying_obsidian
+		execute align xyz {
+			summon $:armor_stand ~0.5 ~0.5 ~0.5 {Marker:1,Invisible:1,NoGravity:1,ArmorItems:[{},{},{},{id:"$:crying_obsidian",Count:1b,tag:{CustomModelData:(BlockID[glowing_obsidian])}}]}
+			tag @nearest[type=armor_stand] add NetherReactorCustomBlock
+		}
+	}
 }
 
 in give {
