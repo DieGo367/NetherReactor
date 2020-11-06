@@ -43,7 +43,7 @@ function init {
 	.scoredef SearchTime
 	.score WarnLoc = (BAR)
 	# block placement
-	.scoredef PlaceSearch
+	.scoredef Raytrace
 	.scoredef HeldBlockID
 	.scoredef PlacedDiamondOre minecraft.used:minecraft.diamond_ore
 	.scoredef PlacedCryingObs minecraft.used:minecraft.crying_obsidian
@@ -63,25 +63,25 @@ function tick {
 	}
 	
 	# core placement detection
-	.call check_placement
-	execute as @a[nbt={Inventory:[{tag:{core:"nether"}}]}] at @s run .call player/start_search
+	.for Block in (BlockNames) {
+		.define ID (BlockID[(Block)])
+		.define Item (SourceItem[(Block)])
+		execute as @a[nbt={SelectedItem:{id:"(Item)",tag:{CustomModelData:(ID)}}}] at @s run .lambda {
+			.score @s.HeldBlockID = (ID)
+			.call player/start_search
+		}
+	}
 	execute as @a[tag=SearchingForCores] at @s run .call player/searching
+	.eval UniqueScores '['+','.join(list(set("(PlaceScores)"[1:-1].split(','))))+']'
+	.for Score in (UniqueScores) {
+		.score @a.(Score) = 0
+	}
 
 	# core tick update
 	execute as @reactors at @s run .call core/tick
 	
 	# infinite night
 	.if IsInfiniteNight == 1 run .call infinite_night
-}
-
-function check_placement {
-	.for Block in (BlockNames) {
-		execute as @a[nbt={SelectedItem:{id:"(SourceItem[(Block)])",tag:{CustomModelData:(BlockID[(Block)])}}}] at @s run .lambda {
-			.score @s.HeldBlockID = (BlockID[(Block)])
-			.if @s.(PlaceScore[(Block)]) > 0 run .call player/place/(Block)
-			.score @s.(PlaceScore[(Block)]) = 0
-		}
-	}
 }
 
 in core {
@@ -418,30 +418,26 @@ in player {
 		.score @s.SearchTime = 5
 	}
 	function searching {
-		.range Lateral -4 4
-		.range Vertical -3 5
-		.define here ~(X) ~(Y) ~(Z)
-		.for X in (Lateral) {
-			.for Y in (Vertical) {
-				.for Z in (Lateral) {
-					execute positioned (here) {
-						execute if block ~~~ minecraft:light_blue_shulker_box{Items:[{Slot:0b,tag:{core:"nether"}}]} run .call place
+		.for Block in (BlockNames) {
+			.define Item (SourceItem[(Block)])
+			.define ID (BlockID[(Block)])
+			.define TargetScore (PlaceScore[(Block)])
+			execute if entity @s[scores={HeldBlockID=(ID)}] at @s {
+				.if @s.(TargetScore) > 0 run .call player/place/(Block)
 					}
 				}
-			}
-		}
 		.score @s.SearchTime --
 		.if @s.SearchTime == 0 run tag @s remove SearchingForCores
 	}
 	in place {
 		for Block in (BlockNames) {
 			function (Block) {
-				.score @s.PlaceSearch = 5000
+				.score @s.Raytrace = 5000
 				execute anchored eyes run .lambda {
-					.score @s.PlaceSearch --
+					.score @s.Raytrace --
 					execute unless block ~~~ (SourceItem[(Block)]) {
-						.if @s.PlaceSearch == 0 run say ran out..
-						.if @s.PlaceSearch > 0 {
+						.if @s.Raytrace == 0 run say ran out..
+						.if @s.Raytrace > 0 {
 							execute positioned ^ ^ ^0.01 run .recurse
 						}
 					}
@@ -496,13 +492,21 @@ function place {
 	execute as @nearest[type=$:shulker] run .call core/init
 }
 
+function empty_spawner {
+	data modify block ~~~ RequiredPlayerRange set value 0
+	data modify block ~~~ SpawnData set value {}
+	data modify block ~~~ SpawnPotentials set value []
+}
+
 in place {
 	for Block in (BlockNames) {
+		define ID (BlockID[(Block)])
+		define Item (SourceItem[(Block)])
 		function (Block) {
 			setblock ~~~ (SourceBlock[(Block)])
-			execute if block ~~~ $:spawner run data modify block ~~~ RequiredPlayerRange set value 0
+			execute if block ~~~ $:spawner run .call empty_spawner
 			execute align xyz {
-				summon $:armor_stand ~0.5 ~0.5 ~0.5 {Marker:1,Invisible:1,NoGravity:1,ArmorItems:[{},{},{},{id:"(SourceItem[(Block)])",Count:1b,tag:{CustomModelData:(BlockID[(Block)])}}],Tags:["NetherReactorCustomBlock"]}
+				summon $:armor_stand ~0.5 ~0.5 ~0.5 {Marker:1,Invisible:1,NoGravity:1,ArmorItems:[{},{},{},{id:"(Item)",Count:1b,tag:{CustomModelData:(ID)}}],Tags:["NetherReactorCustomBlock"]}
 			}
 		}
 	}
