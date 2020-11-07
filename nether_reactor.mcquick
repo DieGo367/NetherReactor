@@ -52,6 +52,7 @@ function init {
 		# block use
 		.scoredef IsInRange
 		.scoredef WasInRange
+		.scoredef HasLooked
 		.scoredef Sneaking minecraft.custom:minecraft.sneak_time
 		.scoredef BlockMine minecraft.custom:minecraft.damage_dealt
 		.scoredef BlockUse minecraft.custom:minecraft.talked_to_villager
@@ -87,6 +88,7 @@ function tick {
 	# core looking detection
 	.score @blocks.Looking = 0
 	.score @a.IsInRange = 0
+	.score @a.HasLooked = 0
 	execute as @blocks[nbt={ArmorItems:[{tag:{CustomModelData:(BlockID[core])}}]}] at @s run .lambda {
 		# ask each nearby player to tally if they can see and right click the block
 		tag @s add Target
@@ -108,6 +110,7 @@ function tick {
 		.if @s.IsInRange == 1 run .if @s.WasInRange == 0 {
 			.score @s.BlockMine = 0
 		}
+		.if @s.HasLooked == 0 run .score @s.BlockMine = 0
 		.score @s.WasInRange = @s.IsInRange
 		.score @s.Sneaking = 0
 	}
@@ -536,8 +539,11 @@ in player {
 					.call player/trace
 					# If definitely looking
 					.if Success == 1 {
+						.score @s.HasLooked ++
 						# If not mining, then send to allow right click
-						.if @s.BlockMine == 0 run .score @target.Looking ++
+						.if @s.BlockMine == 0 run {
+							.score @target.Looking ++
+						}
 
 						# Creative Mode insta-mine
 						.unless @s.BlockMine == 0 run execute if entity @s[gamemode=creative] {
@@ -549,11 +555,7 @@ in player {
 						# Attack boost to allow punching to break
 						execute unless entity @s[nbt={ActiveEffects:[{Id:5b}]}] run effect give @s $:strength 1 0 true
 					}
-					# Reset BlockMine when not looking
-					.if Success == 0 run .score @s.BlockMine = 0
 				}
-				# Reset BlockMine when not even close to looking
-				execute unless entity @target run .score @s.BlockMine = 0
 			}
 		}
 	}
@@ -568,7 +570,7 @@ in player {
 				}
 			}
 			execute if block ~~~ (SourceBlock[core]) {
-				.score Success = 1
+				execute if entity @e[type=$:armor_stand,tag=Target,distance=..0.7] run .score Success = 1
 			}
 		}
 	}
