@@ -545,6 +545,9 @@ in player {
 							# Reset mining since a block has been mined
 							.score @s.BlockMine = 0
 						}
+
+						# Attack boost to allow punching to break
+						execute unless entity @s[nbt={ActiveEffects:[{Id:5b}]}] run effect give @s $:strength 1 0 true
 					}
 					# Reset BlockMine when not looking
 					.if Success == 0 run .score @s.BlockMine = 0
