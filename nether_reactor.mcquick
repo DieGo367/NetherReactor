@@ -129,6 +129,14 @@ function tick {
 			}
 		}
 	}
+	.eval UniqueItems '['+','.join(list(set("(SourceItems)"[1:-1].split(','))))+']'
+	.for Item in (UniqueItems) {
+		.define REST id:"(Item)"
+		execute as @a[nbt={(MainHand)}] run .lambda {
+			.set Temp run data get entity @s SelectedItem.tag.CustomModelData
+			.if Temp == 0 run .score @s.HeldBlockID = 0
+		}
+	}
 	execute as @a run .unless @s.HeldBlockID == 0 run .call player/start_search
 	execute as @a[tag=SearchingForCores] at @s run .call player/searching
 	.eval UniqueScores '['+','.join(list(set("(PlaceScores)"[1:-1].split(','))))+']'
