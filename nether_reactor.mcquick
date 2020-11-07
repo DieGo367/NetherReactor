@@ -52,6 +52,7 @@ function init {
 		# block use
 		.scoredef IsInRange
 		.scoredef WasInRange
+		.scoredef Sneaking minecraft.custom:minecraft.sneak_time
 		.scoredef BlockMine minecraft.custom:minecraft.damage_dealt
 		.scoredef BlockUse minecraft.custom:minecraft.talked_to_villager
 }
@@ -89,7 +90,7 @@ function tick {
 	execute as @blocks[nbt={ArmorItems:[{tag:{CustomModelData:(BlockID[core])}}]}] at @s run .lambda {
 		# ask each nearby player to tally if they can see and right click the block
 		tag @s add Target
-		execute as @a[distance=..4] run .call player/look
+		execute as @a[distance=..4,scores={Sneaking=0}] run .call player/look
 		tag @s remove Target
 	}
 	execute as @blocks[scores={Looking=0}] at @s run {
@@ -108,6 +109,7 @@ function tick {
 			.score @s.BlockMine = 0
 		}
 		.score @s.WasInRange = @s.IsInRange
+		.score @s.Sneaking = 0
 	}
 	
 	# core placement detection
