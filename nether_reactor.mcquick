@@ -35,18 +35,25 @@ list Cores core core_active core_dead
 
 function init {
 	.scoredef
+	.score WarnLoc = (BAR)
 	# core 
 	.scoredef Y
 	.scoredef Reaction
 	.scoredef InvulnTime
+	.scoredef Looking
+	.scoredef LookedAt
 	# player
-	.scoredef SearchTime
-	.score WarnLoc = (BAR)
-	# block placement
-	.scoredef Raytrace
-	.scoredef HeldBlockID
-	.scoredef PlacedDiamondOre minecraft.used:minecraft.diamond_ore
-	.scoredef PlacedCryingObs minecraft.used:minecraft.crying_obsidian
+		# block placement
+		.scoredef SearchTime
+		.scoredef Raytrace
+		.scoredef HeldBlockID
+		.scoredef PlacedDiamondOre minecraft.used:minecraft.diamond_ore
+		.scoredef PlacedCryingObs minecraft.used:minecraft.crying_obsidian
+		# block use
+		.scoredef IsInRange
+		.scoredef WasInRange
+		.scoredef BlockMine minecraft.custom:minecraft.damage_dealt
+		.scoredef BlockUse minecraft.custom:minecraft.talked_to_villager
 }
 
 function tick {
@@ -59,7 +66,48 @@ function tick {
 
 	# block mask deletion
 	execute as @blocks at @s {
-		execute if block ~~~ #~:air run kill @s
+		execute if block ~~~ #~:air run {
+			.call core/disable_click
+			kill @s
+		}
+	}
+
+	# right clicker logic
+	execute as @e[type=$:villager,tag=RightClicker] at @s {
+		# kill clickers that are missing a block and have not just spawned
+		execute unless entity @s[tag=JustSpawned] if block ~ ~1.5 ~ #~:air run tp @s ~ ~-1000 ~
+	}
+	execute as @e[type=$:villager,tag=RightClicker,tag=JustSpawned] at @s {
+		# move clickers down to their block after having spawned for a tick
+		tp @s ~ ~-1000 ~
+		tag @s remove JustSpawned
+	}
+
+	# core looking detection
+	.score @blocks.Looking = 0
+	.score @a.IsInRange = 0
+	execute as @blocks[nbt={ArmorItems:[{tag:{CustomModelData:(BlockID[core])}}]}] at @s run .lambda {
+		# ask each nearby player to tally if they can see and right click the block
+		tag @s add Target
+		execute as @a[distance=..4] run .call player/look
+		tag @s remove Target
+	}
+	execute as @blocks[scores={Looking=0}] at @s run {
+		# if a block is not looked at, disable clickers
+		.call core/disable_click
+		.score @s.LookedAt = 0
+	}
+	execute as @blocks[scores={Looking=1..}] at @s run {
+		# when a block starts to be looked at, enable clickers
+		.unless @s.LookedAt == 1 run .call core/enable_click
+		.score @s.LookedAt = 1
+	}
+	execute as @a {
+		# if a player walks into range of a core, reset BlockMine to enable right click detection
+		.if @s.IsInRange == 1 run .if @s.WasInRange == 0 {
+			.score @s.BlockMine = 0
+		}
+		.score @s.WasInRange = @s.IsInRange
 	}
 	
 	# core placement detection
@@ -91,6 +139,31 @@ in core {
 		# prevent breaking during alignment
 		effect give @s $:resistance 1 255 true
 		.score @s.InvulnTime = 5
+	}
+	# as @blocks
+	define VillagerOffset -1.449
+	function enable_click {
+		.json VillagerData {
+			"NoAI": true,
+			"Silent": true,
+			"Tags": ["RightClicker", "JustSpawned"],
+			"ActiveEffects": [
+				{"Id": 10, "Amplifier": 3, "Duration": 2147483647, "ShowParticles": false},
+				{"Id": 14, "Amplifier": 0, "Duration": 2147483647, "ShowParticles": false}
+			]
+		}
+		execute positioned ~ ~(VillagerOffset) ~ {
+			.define mag 0.202
+			.list pos -(mag) (mag)
+			.for X in (pos) {
+				.for Z in (pos) {
+					summon $:villager ~(X) ~1000 ~(Z) (VillagerData)
+				}
+			}
+		}
+	}
+	function disable_click {
+		execute positioned ~ ~(VillagerOffset) ~ run tp @e[type=$:villager,tag=RightClicker,distance=..0.5] ~ ~-1000 ~
 	}
 	# as @reactors
 	function tick {
@@ -424,8 +497,8 @@ in player {
 			.define TargetScore (PlaceScore[(Block)])
 			execute if entity @s[scores={HeldBlockID=(ID)}] at @s {
 				.if @s.(TargetScore) > 0 run .call player/place/(Block)
-					}
-				}
+			}
+		}
 		.score @s.SearchTime --
 		.if @s.SearchTime == 0 run tag @s remove SearchingForCores
 	}
@@ -436,13 +509,61 @@ in player {
 				execute anchored eyes run .lambda {
 					.score @s.Raytrace --
 					execute unless block ~~~ (SourceItem[(Block)]) {
-						.if @s.Raytrace == 0 run say ran out..
 						.if @s.Raytrace > 0 {
 							execute positioned ^ ^ ^0.01 run .recurse
 						}
 					}
 					execute if block ~~~ (SourceItem[(Block)]) run .call place/(Block)
 				}
+			}
+		}
+	}
+	function look {
+		# at position of target entity
+
+		# count player as near a core
+		.score @s.IsInRange = 1
+
+		# looking from target block to self, step forward
+		execute facing entity @s eyes positioned ^ ^ ^1 {
+			# Looking with player angle, step back
+			execute rotated as @s positioned ^ ^ ^1 {
+				# If we are close to looking at the block center
+				.define @target @e[type=$:armor_stand,tag=Target,distance=..0.5]
+				execute if entity @target run .lambda {
+					.call player/trace
+					# If definitely looking
+					.if Success == 1 {
+						# If not mining, then send to allow right click
+						.if @s.BlockMine == 0 run .score @target.Looking ++
+
+						# Creative Mode insta-mine
+						.unless @s.BlockMine == 0 run execute if entity @s[gamemode=creative] {
+							execute at @target run setblock ~~~ air
+							# Reset mining since a block has been mined
+							.score @s.BlockMine = 0
+						}
+					}
+					# Reset BlockMine when not looking
+					.if Success == 0 run .score @s.BlockMine = 0
+				}
+				# Reset BlockMine when not even close to looking
+				execute unless entity @target run .score @s.BlockMine = 0
+			}
+		}
+	}
+	function trace {
+		.score Success = 0
+		.score @s.Raytrace = 5000
+		execute at @s anchored eyes run .lambda {
+			.score @s.Raytrace --
+			execute unless block ~~~ (SourceBlock[core]) {
+				.if @s.Raytrace > 0 {
+					execute positioned ^ ^ ^0.01 run .recurse
+				}
+			}
+			execute if block ~~~ (SourceBlock[core]) {
+				.score Success = 1
 			}
 		}
 	}
