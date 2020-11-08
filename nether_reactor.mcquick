@@ -29,10 +29,12 @@ list BlockIDs 1 2 3 4
 list SourceBlocks $:spawner $:spawner $:spawner $:crying_obsidian
 list SourceItems $:diamond_ore $:diamond_ore $:diamond_ore $:crying_obsidian
 list PlaceScores PlacedDiamondOre PlacedDiamondOre PlacedDiamondOre PlacedCryingObs
+list LootTables ~:block/core ~:block/core ~:block/core ~:block/glowing_obsidian
 # Custom Block Table Maps
 map BlockID maps (BlockNames) to (BlockIDs)
 map SourceBlock maps (BlockNames) to (SourceBlocks)
 map SourceItem maps (BlockNames) to (SourceItems)
+map LootTable maps (BlockNames) to (LootTables)
 map PlaceScore maps (BlockNames) to (PlaceScores)
 # Clickable Custom Blocks
 list ClickableBlocks core
@@ -184,16 +186,20 @@ in block {
 		.call block/disable_click
 
 		.define @xp @e[type=$:experience_orb,distance=..0.1]
-		.define @drop @e[type=$:item,distance=..0.1]
-		.define @customdrop @drop[nbt={Item:{tag:{CustomBlockDrop:true}}}]
+		.define @drop @e[type=$:item,distance=..0.5]
 
-		execute if entity @drop run loot spawn ~~~ loot ~:blockdrop
-		execute as @drop unless entity @s[nbt={Item:{tag:{CustomBlockDrop:true}}}] run kill @s
-		execute if entity @xp run loot spawn ~~~ loot ~:blockdrop
+		.score Dropped = 0
+		execute if entity @drop run .score Dropped = 1
+		kill @drop
+		execute if entity @xp run .score Dropped = 1
 		kill @xp
-		tag @s add Target
-		execute as @customdrop {
-			data modify entity @s Item set from entity @nearest[type=$:armor_stand,tag=Target] ArmorItems[3]
+		.if Dropped == 1 run .lambda {
+			.for Block in (BlockNames) {
+				.define ID (BlockID[(Block)])
+				.define Item (SourceItem[(Block)])
+				.define LootTable (LootTable[(Block)])
+				execute if entity @s[nbt={ArmorItems:[{id:"(Item)",tag:{CustomModelData:(ID)}}]}] run loot spawn ~~~ loot (LootTable)
+			}
 		}
 		kill @s
 	}
@@ -226,18 +232,33 @@ in block {
 		data modify block ~~~ SpawnData set value {}
 		data modify block ~~~ SpawnPotentials set value []
 	}
-}
-loot blockdrop {
-	"type": "command",
-	"pools": [{
-		"rolls": 1,
-		"entries": [{
-			"type": "minecraft:item",
-			"name": "minecraft:dirt",
-			"functions": [{"function": "minecraft:set_nbt", "tag": "{\"CustomBlockDrop\":true}"}],
-			"weight": 1
-		}]
-	}]
+	json ItemText {
+		"text": "(Text)",
+		"italic": false
+	}
+	for Block in [core,glowing_obsidian] {
+		define ID (BlockID[(Block)])
+		define Item (SourceItem[(Block)])
+		define Text (Text[(Block)])
+		json TagData {
+			"CustomModelData": (ID),
+			"display": {
+				"Name": (string[ItemText])
+			}
+		}
+		loot (Block) {
+			"type": "command",
+			"pools": [{
+				"rolls": 1,
+				"entries": [{
+					"type": "$:item", "name": "(Item)",
+					"functions": [
+						{"function": "$:set_nbt", "tag": (string[TagData])}
+					]
+				}]
+			}]
+		}
+	}
 }
 
 in core {
