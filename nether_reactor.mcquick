@@ -36,13 +36,19 @@ map SourceBlock maps (BlockNames) to (SourceBlocks)
 map SourceItem maps (BlockNames) to (SourceItems)
 map LootTable maps (BlockNames) to (LootTables)
 map PlaceScore maps (BlockNames) to (PlaceScores)
-# Clickable Custom Blocks
-list ClickableBlocks core
 # Custom Block Text
 define Text[core] Nether Reactor Core
 define Text[core_active] (Text[core])
 define Text[core_dead] (Text[core])
 define Text[glowing_obsidian] Glowing Obsidian
+# Custom Block Hooks
+list HasUse core
+list UseHooks ~:core/activation_check
+list HasBreak core core_active
+list BreakHooks ~:core/break ~:core/break
+# Hook table maps
+map UseHook maps (HasUse) to (UseHooks)
+map BreakHook maps (HasBreak) to (BreakHooks)
 
 function init {
 	.scoredef
@@ -53,6 +59,7 @@ function init {
 	.scoredef InvulnTime
 	.scoredef Looking
 	.scoredef LookedAt
+	.scoredef Used
 	# player
 		# block placement
 		.scoredef SearchTime
@@ -112,7 +119,7 @@ in block {
 		.score @a.HasLooked = 0
 		
 		# ask each nearby player to tally if they can see and right click the block
-		.for Block in (ClickableBlocks) {
+		.for Block in (HasUse) {
 			execute as @blocks[nbt={ArmorItems:[{tag:{CustomModelData:(BlockID[(Block)])}}]}] at @s run .call block/player_poll
 		}
 		execute as @blocks[scores={Looking=0}] at @s run {
@@ -124,6 +131,12 @@ in block {
 			# when a block starts to be looked at, enable clickers
 			.unless @s.LookedAt == 1 run .call block/enable_click
 			.score @s.LookedAt = 1
+		}
+		execute as @blocks[scores={Used=1..}] at @s run {
+			.for Block in (HasUse) {
+				execute if entity @s[nbt={ArmorItems:[{tag:{CustomModelData:(BlockID[(Block)])}}]}] run .call (UseHook[(Block)])
+			}
+			.score @s.Used = 0
 		}
 		execute as @a {
 			# if a player walks into range of a core, reset BlockMine to enable right click detection
@@ -188,11 +201,13 @@ in block {
 		.define @xp @e[type=$:experience_orb,distance=..0.1]
 		.define @drop @e[type=$:item,distance=..0.5]
 
+		# if loot or xp is dropped, then the player is in survival. kill the drops
 		.score Dropped = 0
 		execute if entity @drop run .score Dropped = 1
 		kill @drop
 		execute if entity @xp run .score Dropped = 1
 		kill @xp
+		# if so, summon the appropriate loot for the custom block
 		.if Dropped == 1 run .lambda {
 			.for Block in (BlockNames) {
 				.define ID (BlockID[(Block)])
@@ -201,6 +216,15 @@ in block {
 				execute if entity @s[nbt={ArmorItems:[{id:"(Item)",tag:{CustomModelData:(ID)}}]}] run loot spawn ~~~ loot (LootTable)
 			}
 		}
+
+		# call custom block break hook
+		.for Block in (HasBreak) {
+			.define ID (BlockID[(Block)])
+			.define Item (SourceItem[(Block)])
+			.define Callback (BreakHook[(Block)])
+			execute if entity @s[nbt={ArmorItems:[{id:"(Item)",tag:{CustomModelData:(ID)}}]}] run .call (Callback)
+		}
+
 		kill @s
 	}
 	define VillagerOffset -1.449
@@ -293,15 +317,16 @@ in core {
 		tag @a remove HasPickaxe
 	}
 	function break {
-		tag @s remove NetherReactorCore
-		tag @s remove Active
-		tag @s remove Dead
-		tp @s ~ -1000 ~
-		kill @s
+		# tag @s remove NetherReactorCore
+		# tag @s remove Active
+		# tag @s remove Dead
+		# tp @s ~ -1000 ~
+		# kill @s
+		say done broke
 		bossbar set ~:bossbar players
-		execute as @p[distance=..6,tag=HasPickaxe] unless entity @s[gamemode=creative] {
-			loot spawn ~~~ loot ~:core
-		}
+		# execute as @p[distance=..6,tag=HasPickaxe] unless entity @s[gamemode=creative] {
+		# 	loot spawn ~~~ loot ~:core
+		# }
 	}
 	function activation_check {
 		.set @s.Y run data get entity @s Pos[1]
@@ -639,6 +664,11 @@ in player {
 					# If definitely looking
 					.if Success == 1 {
 						.score @s.HasLooked ++
+
+						# claim detected right click
+						.if @s.BlockUse > 0 run .score @target.Used ++
+						.score @s.BlockUse = 0
+
 						# If not mining, then send to allow right click
 						.if @s.BlockMine == 0 run {
 							.score @target.Looking ++
