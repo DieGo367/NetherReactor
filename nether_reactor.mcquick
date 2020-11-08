@@ -16,9 +16,8 @@ define @item @e[type=$:item]
 define @decayer @item[nbt={Item:{tag:{decayer:1b}}}]
 define @diamonds @item[nbt={Item:{id:"minecraft:diamond",Count:3b}}]
 define @irons @item[nbt={Item:{id:"minecraft:iron_ingot",Count:6b}}]
-define @reactors @e[type=$:shulker,tag=NetherReactorCore]
 define @blocks @e[type=$:armor_stand,tag=NetherReactorCustomBlock]
-define @clickers @e[type=$:villager,tag=RightClicker]
+define @clickers @e[type=$:villager,tag=NetherReactorRightClicker]
 
 define setWarnMsg data modify storage ~:warn msg set value
 enum BAR CHAT TITLE
@@ -56,7 +55,6 @@ function init {
 	# core 
 	.scoredef Y
 	.scoredef Reaction
-	.scoredef InvulnTime
 	.scoredef Looking
 	.scoredef LookedAt
 	.scoredef Used
@@ -105,7 +103,7 @@ function tick {
 	.call block/place_check
 	
 	# core tick update
-	execute as @reactors at @s run .call core/tick
+	execute as @blocks[tag=ActiveCore] at @s positioned ~ ~-0.5 ~ run .call core/reaction
 	
 	# infinite night
 	.if IsInfiniteNight == 1 run .call infinite_night
@@ -199,7 +197,7 @@ in block {
 		.call block/disable_click
 
 		.define @xp @e[type=$:experience_orb,distance=..0.1]
-		.define @drop @e[type=$:item,distance=..0.5]
+		.define @drop @item[distance=..0.5]
 
 		# if loot or xp is dropped, then the player is in survival. kill the drops
 		.score Dropped = 0
@@ -232,7 +230,7 @@ in block {
 		.json VillagerData {
 			"NoAI": true,
 			"Silent": true,
-			"Tags": ["RightClicker", "JustSpawned"],
+			"Tags": ["NetherReactorRightClicker", "JustSpawned"],
 			"ActiveEffects": [
 				{"Id": 10, "Amplifier": 3, "Duration": 2147483647, "ShowParticles": false},
 				{"Id": 14, "Amplifier": 0, "Duration": 2147483647, "ShowParticles": false}
@@ -249,7 +247,7 @@ in block {
 		}
 	}
 	function disable_click {
-		execute positioned ~ ~(VillagerOffset) ~ run tp @e[type=$:villager,tag=RightClicker,distance=..0.5] ~ ~-1000 ~
+		execute positioned ~ ~(VillagerOffset) ~ run tp @clickers[distance=..0.5] ~ ~-1000 ~
 	}
 	function empty_spawner {
 		data modify block ~~~ RequiredPlayerRange set value 0
@@ -285,48 +283,10 @@ in block {
 	}
 }
 
+# as @blocks
 in core {
-	# as new reactor
-	function init {
-		tag @s add NetherReactorCore
-		# prevent breaking during alignment
-		effect give @s $:resistance 1 255 true
-		.score @s.InvulnTime = 5
-	}
-	# as @reactors
-	function tick {
-		# Starting invulnerability
-		.if @s.InvulnTime == 1 run effect clear @s
-		.if @s.InvulnTime > 0 run .score @s.InvulnTime --
-		# Shulker took damage
-		execute unless entity @s[nbt={"Health":30f}] run .call core/damage
-		# Run reaction logic
-		execute if entity @s[tag=Active] run .call core/reaction
-	}
-	function damage {
-		data modify entity @s Health set value 30
-		.define @target @p[distance=..6]
-		tag @a remove HasPickaxe 
-
-		execute as @target run .call player/check_pickaxe
-		execute if entity @target[tag=HasPickaxe] run .call core/break
-		execute if entity @target unless entity @target[tag=HasPickaxe] {
-			execute unless entity @s[tag=Active] unless entity @s[tag=Dead] run .call core/activation_check
-		}
-		
-		tag @a remove HasPickaxe
-	}
 	function break {
-		# tag @s remove NetherReactorCore
-		# tag @s remove Active
-		# tag @s remove Dead
-		# tp @s ~ -1000 ~
-		# kill @s
-		say done broke
 		bossbar set ~:bossbar players
-		# execute as @p[distance=..6,tag=HasPickaxe] unless entity @s[gamemode=creative] {
-		# 	loot spawn ~~~ loot ~:core
-		# }
 	}
 	function activation_check {
 		.set @s.Y run data get entity @s Pos[1]
@@ -335,8 +295,8 @@ in core {
 			execute if entity @s[tag=IsValid] run .call core/start
 			execute unless entity @s[tag=IsValid] run (setWarnMsg) "Not the correct pattern!"
 		}
-		.unless @s.Y > 7 run (setWarnMsg) "The nether reactor needs to be built lower down."
-		.unless @s.Y < 223 run (setWarnMsg) "The nether reactor needs to be built higher up."
+		.unless @s.Y > 7 run (setWarnMsg) "The nether reactor needs to be built higher up."
+		.unless @s.Y < 223 run (setWarnMsg) "The nether reactor needs to be built lower down."
 		
 		execute if data storage ~:warn msg run .lambda {
 			.if WarnLoc == (BAR) run title @p actionbar {"text":"","extra":[{"storage":"~:warn","nbt":"msg"}]}
@@ -344,10 +304,6 @@ in core {
 			.if WarnLoc == (CHAT) run tellraw @p {"text":"","extra":[{"storage":"~:warn","nbt":"msg"}]}
 			data remove storage ~:warn msg
 		}
-	}
-	function summon_mark {
-		# summon $:armor_stand ~~~ {NoGravity:true}
-		effect give @e[type=$:armor_stand,limit=1,sort=nearest] $:glowing 100
 	}
 	function structure_check {
 		tag @s add IsValid
@@ -391,9 +347,9 @@ in core {
 		bossbar set ~:bossbar color blue
 		bossbar set ~:bossbar max 920
 		bossbar set ~:bossbar value 0
-		tag @s add Active
+		tag @s add ActiveCore
 		# set red
-		data modify entity @s Color set value 14
+		data modify entity @s ArmorItems[3].tag.CustomModelData set value (BlockID[core_active])
 		.score IsInfiniteNight = 1
 		.score @s.Reaction = 0
 		.call spire
@@ -414,112 +370,99 @@ in core {
 
 		# glowing obsidian replacing cobblestone
 		.if @s.Reaction == 40 run .lambda {
-			fill ~-1 ~-1 ~ ~1 ~-1 ~ $:crying_obsidian
-			setblock ~ ~-1 ~-1 $:crying_obsidian
-			setblock ~ ~-1 ~1 $:crying_obsidian
+			.for X in [-1,0,1] run execute positioned ~(X) ~-1 ~ run .call block/place/glowing_obsidian 
+			.for Z in [-1,1] run execute positioned ~ ~-1 ~(Z) run .call block/place/glowing_obsidian 
 		}
 		.if @s.Reaction == 60 run .lambda {
 			.for X in [-1,1] {
 				.for Z in [-1,1] {
-					setblock ~(X) ~ ~(Z) $:crying_obsidian
+					execute positioned ~(X) ~ ~(Z) run .call block/place/glowing_obsidian
 				}
 			}
 		}
 		.if @s.Reaction == 80 run .lambda {
-			fill ~-1 ~1 ~ ~1 ~1 ~ $:crying_obsidian
-			setblock ~ ~1 ~-1 $:crying_obsidian
-			setblock ~ ~1 ~1 $:crying_obsidian
+			.for X in [-1,0,1] run execute positioned ~(X) ~1 ~ run .call block/place/glowing_obsidian 
+			.for Z in [-1,1] run execute positioned ~ ~1 ~(Z) run .call block/place/glowing_obsidian 
 		}
 		# gold is replaced
 		.if @s.Reaction == 140 run .lambda {
 			.for X in [-1,1] {
 				.for Z in [-1,1] {
-					setblock ~(X) ~-1 ~(Z) $:crying_obsidian
+					execute positioned ~(X) ~-1 ~(Z) run .call block/place/glowing_obsidian
 				}
 			}
 		}
 		# item and mob spawns
 		.if @s.Reaction == 200 run .lambda {
 			bossbar set ~:bossbar color red
-			.call reactor/spawns 15 15 2
+			.call core/spawns 15 15 2
 		}
-		.if @s.Reaction == 260 run .lambda run .call reactor/spawns 15 15 2
-		.if @s.Reaction == 400 run .lambda run .call reactor/spawns 15 15 2
-		.if @s.Reaction == 440 run .lambda run .call reactor/spawns 0 35 1
-		.if @s.Reaction == 500 run .lambda run .call reactor/spawns 0 40 1
-		.if @s.Reaction == 600 run .lambda run .call reactor/spawns 0 32 0
-		.if @s.Reaction == 680 run .lambda run .call reactor/spawns 0 20 0
-		.if @s.Reaction == 720 run .lambda run .call reactor/spawns 0 24 0
-		.if @s.Reaction == 760 run .lambda run .call reactor/spawns 0 36 0
-		.if @s.Reaction == 800 run .lambda run .call reactor/spawns 0 20 0
+		.if @s.Reaction == 260 run .lambda run .call core/spawns 15 15 2
+		.if @s.Reaction == 400 run .lambda run .call core/spawns 15 15 2
+		.if @s.Reaction == 440 run .lambda run .call core/spawns 0 35 1
+		.if @s.Reaction == 500 run .lambda run .call core/spawns 0 40 1
+		.if @s.Reaction == 600 run .lambda run .call core/spawns 0 32 0
+		.if @s.Reaction == 680 run .lambda run .call core/spawns 0 20 0
+		.if @s.Reaction == 720 run .lambda run .call core/spawns 0 24 0
+		.if @s.Reaction == 760 run .lambda run .call core/spawns 0 36 0
+		.if @s.Reaction == 800 run .lambda run .call core/spawns 0 20 0
 		# burning out of obsidian
+		.define clear run execute positioned ~(X) ~(Y) ~(Z) run kill @blocks[distance=..0.1]
 		.if @s.Reaction == 860 run .lambda {
 			bossbar set ~:bossbar color purple
+			.define Y 1.5
+			.for X in [-1,0,1] run .for Z in [-1,0,1] (clear)
 			fill ~-1 ~1 ~-1 ~1 ~1 ~1 $:obsidian
 		}
 		.if @s.Reaction == 880 run .lambda {
-			fill ~-1 ~ ~-1 ~1 ~ ~1 $:obsidian
-			setblock ~~~ $:air
+			.define Y 0.5
+			.for X in [-1,0,1] run .for Z in [-1,1] (clear)
+			.for X in [0] run .for Z in [-1,1] (clear)
+			fill ~1 ~ ~1 ~1 ~ ~-1 $:obsidian
+			fill ~-1 ~ ~1 ~-1 ~ ~-1 $:obsidian
+			setblock ~ ~ ~1 $:obsidian
+			setblock ~ ~ ~-1 $:obsidian
 		}
-		.if @s.Reaction == 900 run fill ~-1 ~-1 ~-1 ~1 ~-1 ~1 $:obsidian
+		.if @s.Reaction == 900 run .lambda {
+			.define Y -0.5
+			.for X in [-1,0,1] run .for Z in [-1,0,1] (clear)
+			fill ~-1 ~-1 ~-1 ~1 ~-1 ~1 $:obsidian
+		}
 		# end of reaction
 		.if @s.Reaction >= 920 run .call core/end
 	}
 	function end {
 		# update to dead
-		tag @s remove Active
-		tag @s add Dead
+		tag @s remove ActiveCore
 		# set black
-		data modify entity @s Color set value 7
+		data modify entity @s ArmorItems[3].tag.CustomModelData set value (BlockID[core_dead])
 		# remove bossbar
-		execute unless entity @reactors[tag=Active] run bossbar remove ~:bossbar
+		bossbar set ~:bossbar players
+		execute unless entity @blocks[tag=ActiveCore] run bossbar remove ~:bossbar
 		# remove Infinite night
 		.score IsInfiniteNight = 0
 		# structure changes
-		fill ~-1 ~-1 ~-1 ~1 ~1 ~1 $:obsidian
-		setblock ~~~ air
+		fill ~-1 ~1 ~-1 ~1 ~1 ~1 $:obsidian
+		fill ~1 ~ ~1 ~1 ~ ~-1 $:obsidian
+		fill ~-1 ~ ~1 ~-1 ~ ~-1 $:obsidian
+		setblock ~ ~ ~1 $:obsidian
+		setblock ~ ~ ~-1 $:obsidian
+		fill ~-1 ~-1 ~-1 ~1 ~-1 ~1 $:obsidian
 		.call decay_spire
 	}
-}
-loot core {
-	"type": "command",
-	"pools": [{
-		"rolls": 1,
-		"entries": [{
-			"type": "minecraft:item",
-			"name": "minecraft:light_blue_shulker_box",
-			"functions": [
-				{
-					"function": "minecraft:set_nbt",
-					"tag": "{\"core\":\"nether\", \"BlockEntityTag\":{\"Items\":[{\"Slot\":0,\"id\":\"minecraft:diamond\",\"Count\":1,\"tag\":{\"core\":\"nether\"}}]}}"
-				},
-				{
-					"function": "minecraft:set_name",
-					"name": {
-						"text": "Nether Reactor Core",
-						"color": "yellow"
-					}
-				}
-			],
-			"weight": 1
-		}]
-	}]
-}
-
-# still as @reactors
-in reactor {
+	# Reaction functions
 	function spawns takes RNG_Min RNG_Max MobLimit {
 		.do rng
 		.score ItemCount = RNG
-		execute positioned ~ ~-1 ~ run .call reactor/spawn_items
+		execute positioned ~ ~-1 ~ run .call core/spawn_items
 		.score ItemCount reset
 		# locating pigmen
-		.if MobLimit > 0 run .call reactor/spawn_mobs
+		.if MobLimit > 0 run .call core/spawn_mobs
 		.score MobLimit reset
 	}
 	function spawn_items {
 		.if ItemCount > 0 run .lambda {
-			.call reactor/random_spot
+			.call core/random_spot
 			.define @spot @nearest[type=$:area_effect_cloud,tag=RandomSpot]
 			execute at @spot run loot spawn ~~~ loot ~:rewards
 			kill @spot
@@ -533,7 +476,7 @@ in reactor {
 			execute as @e[type=$:zombified_piglin,dx=14,dy=3,dz=14] run .score MobCount ++
 		}
 		.if MobCount < 3 run .lambda {
-			.call reactor/spawn_mob
+			.call core/spawn_mob
 			.score MobCount ++
 			.score MobLimit --
 			.if MobCount < 3 run .if MobLimit > 0 run .recurse
@@ -541,7 +484,7 @@ in reactor {
 		.score MobCount reset
 	}
 	function spawn_mob {
-		.call reactor/random_spot
+		.call core/random_spot
 		.define @spot @nearest[type=$:area_effect_cloud,tag=RandomSpot]
 		execute at @spot run summon $:zombified_piglin ~~~
 		kill @spot
@@ -608,13 +551,6 @@ loot rewards {
 
 # as @p
 in player {
-	function check_pickaxe {
-		.for Pickaxe in [$:iron_pickaxe,$:diamond_pickaxe,$:netherite_pickaxe] {
-			execute if entity @s[nbt={SelectedItem:{id:"(Pickaxe)"}}] {
-				tag @s add HasPickaxe
-			}
-		}
-	}
 	function start_place_checks {
 		tag @s add Checking
 		.score @s.SearchTime = 5
@@ -713,23 +649,19 @@ function anger {
 
 
 function craft {
+	.define ID (BlockID[core])
+	.define Item (SourceItem[core])
+	.json Text {
+		"text": "(Text[core])",
+		"italic": false
+	}
 	.json NetherReactorCoreItem {
 		"Item": {
-			"id": "minecraft:light_blue_shulker_box",
+			"id": "(Item)",
 			"Count": 1,
 			"tag": {
-				"core": "nether",
-				"display": {"Name": "{\"text\":\"Nether Reactor Core\",\"color\":\"yellow\"}"},
-				"BlockEntityTag": {
-					"Items": [{
-						"Slot": 0,
-						"id": "minecraft:diamond",
-						"Count": 1,
-						"tag": {
-							"core": "nether"
-						}
-					}]
-				}
+				"CustomModelData": (ID),
+				"display": {"Name": (string[Text])}
 			}
 		}
 	}
@@ -737,12 +669,6 @@ function craft {
 	kill @s
 	summon $:item ~~~ (NetherReactorCoreItem)
 	particle $:composter ~~~ 0.25 0.5 0.25 0.5 50 normal
-}
-
-function place {
-	setblock ~~~ $:air
-	summon $:shulker ~~~ {"NoAI":true,"Color":3b}
-	execute as @nearest[type=$:shulker] run .call core/init
 }
 
 in give {
