@@ -53,8 +53,12 @@ map BreakHook maps (HasBreak) to (BreakHooks)
 function init {
 	.scoredef
 	.score WarnLoc = (BAR)
-	# core 
+	.scoredef X
 	.scoredef Y
+	.scoredef Z
+	.scoredef Pitch
+	.scoredef Yaw
+	# core 
 	.scoredef Reaction
 	.scoredef Looking
 	.scoredef LookedAt
@@ -73,6 +77,9 @@ function init {
 		.scoredef Sneaking minecraft.custom:minecraft.sneak_time
 		.scoredef BlockMine minecraft.custom:minecraft.damage_dealt
 		.scoredef BlockUse minecraft.custom:minecraft.talked_to_villager
+		# crafting
+		.scoredef OpenedTable minecraft.custom:minecraft.interact_with_crafting_table
+		.scoredef Crafted minecraft.crafted:minecraft.structure_void
 }
 
 function tick {
@@ -80,6 +87,20 @@ function tick {
 	execute as @diamonds at @s {
 		execute if block ~ ~-1 ~ minecraft:crafting_table {
 			execute if entity @irons[distance=..1] run .call craft
+		}
+	}
+
+	# new crafting
+	execute as @a at @s run .if @s.OpenedTable > 0 run .lambda {
+		# todo: fix this so that movement is only detected after a tick of opening
+		.define get run data get entity @s
+		.define add run .score @s.OpenedTable = 0
+		.list Target X Y Z Pitch Yaw
+		.list Data Pos[0] Pos[1] Pos[2] Rotation[0] Rotation[1]
+		.for i in [0,1,2,3,4] {
+			.set Temp (get) (Data[(i)])
+			.unless @s.(Target[(i)]) == Temp (add)
+			.score @s.(Target[(i)]) = Temp
 		}
 	}
 
@@ -105,7 +126,7 @@ function tick {
 	
 	# core tick update
 	execute as @blocks[tag=ActiveCore] at @s positioned ~ ~-0.5 ~ run .call core/reaction
-	
+
 	# infinite night
 	.if IsInfiniteNight == 1 run .call infinite_night
 }
@@ -282,6 +303,19 @@ in block {
 			}]
 		}
 	}
+}
+recipe core {
+	"type": "$:crafting_shaped",
+	"pattern": [
+		"did",
+		"did",
+		"did"
+	],
+	"key": {
+		"d": {"item": "$:diamond"},
+		"i": {"item": "$:iron_ingot"}
+	},
+	"result": {"item": "$:structure_void"}
 }
 
 # as @blocks
