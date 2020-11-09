@@ -9,7 +9,8 @@ tag functions tick [nether_reactor:tick]
 namespace nether_reactor
 nameglobals NetherReactorVar
 
-tag blocks air [minecraft:air,minecraft:cave_air]
+tag blocks air [minecraft:air,minecraft:cave_air,minecraft:void_air]
+tag blocks non_solid [#~:air,$:water,$:lava,#$:saplings,#$:flowers,$:brown_mushroom,$:red_mushroom,#$:crops,$:sugar_cane,$:lily_pad,$:nether_wart,$:cocoa,$:chorus_plant,$:chorus_flower,$:sweet_berry_bush,$:crimson_fungus,$:warped_fungus,$:weeping_vines,$:weeping_vines_plant,$:twisting_vines,$:twisting_vines_plant,$:tall_grass,$:fern,$:large_fern,$:dead_bush,#$:tall_flowers,$:vine,$:crimson_roots,$:warped_roots,$:nether_sprouts,$:seagrass,$:tall_seagrass,$:kelp,$:kelp_plant,#$:corals,#$:wall_corals,$:sea_pickle,#$:fire,#$:rails,$:torch,$:wall_torch,$:redstone_torch,$:redstone_wall_torch,$:soul_torch,$:soul_wall_torch,$:redstone_wire,$:repeater,$:comparator,$:lever,#$:buttons,$:tripwire,$:tripwire_hook,#$:flower_pots,$:creeper_head,$:creeper_wall_head,$:dragon_head,$:dragon_wall_head,$:player_head,$:player_wall_head,$:zombie_head,$:zombie_wall_head,$:skeleton_skull,$:skeleton_wall_skull,$:wither_skeleton_skull,$:wither_skeleton_wall_skull,#$:carpets,$:snow,#$:portals,$:structure_void,$:dead_brain_coral,$:dead_brain_coral_fan,$:dead_brain_coral_wall_fan,$:dead_bubble_coral,$:dead_bubble_coral_fan,$:dead_bubble_coral_wall_fan,$:dead_fire_coral,$:dead_fire_coral_fan,$:dead_fire_coral_wall_fan,$:dead_horn_coral,$:dead_horn_coral_fan,$:dead_horn_coral_wall_fan,$:dead_tube_coral,$:dead_tube_coral_fan,$:dead_tube_coral_wall_fan,$:bamboo,$:bamboo_sapling]
 
 define @nearest @e[limit=1,sort=nearest]
 define @item @e[type=$:item]
@@ -631,7 +632,7 @@ in player {
 			.score @s.Raytrace --
 			execute align xyz positioned ~0.5 ~0.5 ~0.5 if entity @e[type=$:armor_stand,tag=Target,distance=..0.1] run .score Success = 1
 			.if Success == 0 run .if @s.Raytrace > 0 {
-				execute positioned ^ ^ ^0.1 run .recurse
+				execute if block ~~~ #~:non_solid positioned ^ ^ ^0.1 run .recurse
 			}
 		}
 	}
