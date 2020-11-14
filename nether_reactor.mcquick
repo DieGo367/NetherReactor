@@ -2,53 +2,51 @@ pack Adds the Nether Reactor from early versions of Minecraft: Pocket Edition
 icon nether_reactor
 
 namespace minecraft
-tag functions load [nether_reactor:init]
-tag functions tick [nether_reactor:tick]
+tag functions load [nether_reactor:init,guise:load]
+tag functions tick [nether_reactor:tick,guise:tick]
+
+namespace guise
+declare block/place
+tag functions load_blocks [nether_reactor:load_blocks]
+tag functions use_hooks [nether_reactor:use_hook]
+tag functions break_hooks [nether_reactor:break_hook]
 
 
 namespace nether_reactor
 nameglobals NetherReactorVar
-
-tag blocks air [minecraft:air,minecraft:cave_air,minecraft:void_air]
-tag blocks non_solid [#~:air,$:water,$:lava,#$:saplings,#$:flowers,$:brown_mushroom,$:red_mushroom,#$:crops,$:sugar_cane,$:lily_pad,$:nether_wart,$:cocoa,$:chorus_plant,$:chorus_flower,$:sweet_berry_bush,$:crimson_fungus,$:warped_fungus,$:weeping_vines,$:weeping_vines_plant,$:twisting_vines,$:twisting_vines_plant,$:tall_grass,$:fern,$:large_fern,$:dead_bush,#$:tall_flowers,$:vine,$:crimson_roots,$:warped_roots,$:nether_sprouts,$:seagrass,$:tall_seagrass,$:kelp,$:kelp_plant,#$:corals,#$:wall_corals,$:sea_pickle,#$:fire,#$:rails,$:torch,$:wall_torch,$:redstone_torch,$:redstone_wall_torch,$:soul_torch,$:soul_wall_torch,$:redstone_wire,$:repeater,$:comparator,$:lever,#$:buttons,$:tripwire,$:tripwire_hook,#$:flower_pots,$:creeper_head,$:creeper_wall_head,$:dragon_head,$:dragon_wall_head,$:player_head,$:player_wall_head,$:zombie_head,$:zombie_wall_head,$:skeleton_skull,$:skeleton_wall_skull,$:wither_skeleton_skull,$:wither_skeleton_wall_skull,#$:carpets,$:snow,#$:portals,$:structure_void,$:dead_brain_coral,$:dead_brain_coral_fan,$:dead_brain_coral_wall_fan,$:dead_bubble_coral,$:dead_bubble_coral_fan,$:dead_bubble_coral_wall_fan,$:dead_fire_coral,$:dead_fire_coral_fan,$:dead_fire_coral_wall_fan,$:dead_horn_coral,$:dead_horn_coral_fan,$:dead_horn_coral_wall_fan,$:dead_tube_coral,$:dead_tube_coral_fan,$:dead_tube_coral_wall_fan,$:bamboo,$:bamboo_sapling]
 
 define @nearest @e[limit=1,sort=nearest]
 define @item @e[type=$:item]
 define @decayer @item[nbt={Item:{tag:{decayer:1b}}}]
 define @diamonds @item[nbt={Item:{id:"minecraft:diamond",Count:3b}}]
 define @irons @item[nbt={Item:{id:"minecraft:iron_ingot",Count:6b}}]
-define @blocks @e[type=$:armor_stand,tag=NetherReactorCustomBlock]
-define @clickers @e[type=$:villager,tag=NetherReactorRightClicker]
+
+define @blocks @e[type=$:armor_stand,tag=GuiseBlock]
 
 define setWarnMsg data modify storage ~:warn msg set value
 enum BAR CHAT TITLE
 
-# Custom Block Data
-list BlockNames core core_active core_dead glowing_obsidian
-list BlockIDs 1 2 3 4
-list SourceBlocks $:spawner $:spawner $:spawner $:crying_obsidian
-list SourceItems $:diamond_ore $:diamond_ore $:diamond_ore $:crying_obsidian
-list PlaceScores PlacedDiamondOre PlacedDiamondOre PlacedDiamondOre PlacedCryingObs
-list LootTables ~:block/core ~:block/core ~:block/core ~:block/glowing_obsidian
-# Custom Block Table Maps
-map BlockID maps (BlockNames) to (BlockIDs)
-map SourceBlock maps (BlockNames) to (SourceBlocks)
-map SourceItem maps (BlockNames) to (SourceItems)
-map LootTable maps (BlockNames) to (LootTables)
-map PlaceScore maps (BlockNames) to (PlaceScores)
-# Custom Block Text
-define Text[core] Nether Reactor Core
-define Text[core_active] (Text[core])
-define Text[core_dead] (Text[core])
-define Text[glowing_obsidian] Glowing Obsidian
-# Custom Block Hooks
-list HasUse core
-list UseHooks ~:core/activation_check
-list HasBreak core core_active
-list BreakHooks ~:core/break ~:core/break
-# Hook table maps
-map UseHook maps (HasUse) to (UseHooks)
-map BreakHook maps (HasBreak) to (BreakHooks)
+# # Custom Block Data
+json CoreText {
+	"text": "Nether Reactor Core",
+	"italic": false
+}
+json CoreData {
+	"CustomModelData": 1,
+	"display": {
+		"Name": (CoreText.string)
+	}
+}
+json GlowingText {
+	"text": "Glowing Obsidian",
+	"italic": false
+}
+json GlowingData {
+	"CustomModelData": 4,
+	"display": {
+		"Name": (GlowingText.string)
+	}
+}
 
 function init {
 	.scoredef
@@ -60,23 +58,6 @@ function init {
 	.scoredef Yaw
 	# core 
 	.scoredef Reaction
-	.scoredef Looking
-	.scoredef LookedAt
-	.scoredef Used
-	# player
-		# block placement
-		.scoredef SearchTime
-		.scoredef Raytrace
-		.scoredef HeldBlockID
-		.scoredef PlacedDiamondOre minecraft.used:minecraft.diamond_ore
-		.scoredef PlacedCryingObs minecraft.used:minecraft.crying_obsidian
-		# block use
-		.scoredef IsInRange
-		.scoredef WasInRange
-		.scoredef HasLooked
-		.scoredef Sneaking minecraft.custom:minecraft.sneak_time
-		.scoredef BlockMine minecraft.custom:minecraft.damage_dealt
-		.scoredef BlockUse minecraft.custom:minecraft.talked_to_villager
 		# crafting
 		.scoredef OpenedTable minecraft.custom:minecraft.interact_with_crafting_table
 		.scoredef Crafted minecraft.crafted:minecraft.structure_void
@@ -90,39 +71,19 @@ function tick {
 		}
 	}
 
-	# new crafting
-	execute as @a at @s run .if @s.OpenedTable > 0 run .lambda {
-		# todo: fix this so that movement is only detected after a tick of opening
-		.define get run data get entity @s
-		.define add run .score @s.OpenedTable = 0
-		.list Target X Y Z Pitch Yaw
-		.list Data Pos[0] Pos[1] Pos[2] Rotation[0] Rotation[1]
-		.for i in [0,1,2,3,4] {
-			.set Temp (get) (Data[(i)])
-			.unless @s.(Target[(i)]) == Temp (add)
-			.score @s.(Target[(i)]) = Temp
-		}
-	}
-
-	# block mask deletion
-	execute as @blocks at @s {
-		execute if block ~~~ #~:air run .call block/break
-	}
-
-	# right clicker logic
-	execute as @clickers at @s run .lambda {
-		# kill clickers that are missing a block and have not just spawned
-		execute unless entity @s[tag=JustSpawned] if block ~ ~1.5 ~ #~:air run tp @s ~ ~-1000 ~
-		# move clickers down to their block after having spawned for a tick
-		execute if entity @s[tag=JustSpawned] run tp @s ~ ~-1000 ~
-		tag @s remove JustSpawned
-	}
-
-	# block use detection
-	.call block/use_check
-	
-	# block placement detection
-	.call block/place_check
+	# # new crafting
+	# execute as @a at @s run .if @s.OpenedTable > 0 run .lambda {
+	# 	# todo: fix this so that movement is only detected after a tick of opening
+	# 	.define get run data get entity @s
+	# 	.define add run .score @s.OpenedTable = 0
+	# 	.list Target X Y Z Pitch Yaw
+	# 	.list Data Pos[0] Pos[1] Pos[2] Rotation[0] Rotation[1]
+	# 	.for i in [0,1,2,3,4] {
+	# 		.set Temp (get) (Data[(i)])
+	# 		.unless @s.(Target[(i)]) == Temp (add)
+	# 		.score @s.(Target[(i)]) = Temp
+	# 	}
+	# }
 	
 	# core tick update
 	execute as @blocks[tag=ActiveCore] at @s positioned ~ ~-0.5 ~ run .call core/reaction
@@ -131,178 +92,73 @@ function tick {
 	.if IsInfiniteNight == 1 run .call infinite_night
 }
 
-in block {
-	# general
-	function use_check {
-		.score @blocks.Looking = 0
-		.score @a.IsInRange = 0
-		.score @a.HasLooked = 0
-		
-		# ask each nearby player to tally if they can see and right click the block
-		.for Block in (HasUse) {
-			execute as @blocks[nbt={ArmorItems:[{tag:{CustomModelData:(BlockID[(Block)])}}]}] at @s run .call block/player_poll
-		}
-		execute as @blocks[scores={Looking=0}] at @s run {
-			# if a block is not looked at, disable clickers
-			.call block/disable_click
-			.score @s.LookedAt = 0
-		}
-		execute as @blocks[scores={Looking=1..}] at @s run {
-			# when a block starts to be looked at, enable clickers
-			.unless @s.LookedAt == 1 run .call block/enable_click
-			.score @s.LookedAt = 1
-		}
-		execute as @blocks[scores={Used=1..}] at @s run {
-			.for Block in (HasUse) {
-				execute if entity @s[nbt={ArmorItems:[{tag:{CustomModelData:(BlockID[(Block)])}}]}] run .call (UseHook[(Block)])
-			}
-			.score @s.Used = 0
-		}
-		execute as @a {
-			# if a player walks into range of a core, reset BlockMine to enable right click detection
-			.if @s.IsInRange == 1 run .if @s.WasInRange == 0 {
-				.score @s.BlockMine = 0
-			}
-			.if @s.HasLooked == 0 run .score @s.BlockMine = 0
-			.score @s.WasInRange = @s.IsInRange
-			.score @s.Sneaking = 0
-		}
+function load_blocks {
+	.json core {
+		"id": 1, "Use": true, "Break": true,
+		"SourceItem": "$:diamond_ore",
+		"SourceBlock": "$:spawner",
+		"display": {"Name": (CoreText.string)}
 	}
-	function place_check {
-		# check as players identified to be holding a custom block
-		execute as @a run .unless @s.HeldBlockID == 0 run .call player/start_place_checks
-		execute as @a[tag=Checking] at @s run .call player/place_check
-		.for Score in (set[PlaceScores]) {
-			.score @a.(Score) = 0
-		}
-		.score @a.HeldBlockID = 0
-		.define OffHand Inventory:[{Slot:-106b,(REST)}]
-		.define MainHand SelectedItem:{(REST)}
-		.for Hand in [OffHand,MainHand] {
-			.for Block in (BlockNames) {
-				.define ID (BlockID[(Block)])
-				.define Item (SourceItem[(Block)])
-				.define REST id:"(Item)",tag:{CustomModelData:(ID)}
-				execute as @a[nbt={((Hand))}] {
-					.score @s.HeldBlockID = (ID)
-				}
-			}
-		}
-		.for Item in (set[SourceItems]) {
-			.define REST id:"(Item)"
-			execute as @a[nbt={(MainHand)}] run .lambda {
-				.set Temp run data get entity @s SelectedItem.tag.CustomModelData
-				.if Temp == 0 run .score @s.HeldBlockID = 0
-			}
-		}
+	.json core_active {
+		"id": 2, "Use": false, "Break": true,
+		"SourceItem": "$:diamond_ore",
+		"SourceBlock": "$:spawner",
+		"display": {"Name": (CoreText.string)}
 	}
-	# as @blocks
-	function player_poll {
-		tag @s add Target
-		execute as @a[distance=..4,scores={Sneaking=0}] run .call player/look
-		tag @s remove Target
+	.json core_dead {
+		"id": 3, "Use": false, "Break": true,
+		"SourceItem": "$:diamond_ore",
+		"SourceBlock": "$:spawner",
+		"display": {"Name": (CoreText.string)}
 	}
-	in place {
-		for Block in (BlockNames) {
-			define ID (BlockID[(Block)])
-			define Item (SourceItem[(Block)])
-			function (Block) {
-				setblock ~~~ (SourceBlock[(Block)])
-				execute if block ~~~ $:spawner run .call block/empty_spawner
-				execute align xyz {
-					summon $:armor_stand ~0.5 ~0.5 ~0.5 {Marker:1,Invisible:1,NoGravity:1,ArmorItems:[{},{},{},{id:"(Item)",Count:1b,tag:{CustomModelData:(ID)}}],Tags:["NetherReactorCustomBlock"]}
-				}
-			}
-		}
+	.json glowing_obsidian {
+		"id": 4, "Use": false, "Break": true,
+		"SourceItem": "$:crying_obsidian",
+		"SourceBlock": "$:crying_obsidian",
+		"display": {"Name": (GlowingText.string)}
 	}
-	function break {
-		.call block/disable_click
+	data modify storage guise:blocks list append value (core)
+	data modify storage guise:blocks list append value (core_active)
+	data modify storage guise:blocks list append value (core_dead)
+	data modify storage guise:blocks list append value (glowing_obsidian)
+}
 
-		.define @xp @e[type=$:experience_orb,distance=..0.1]
-		.define @drop @item[distance=..0.5]
+function use_hook {
+	.if ID.GuiseVar == 1 run .call core/activation_check
+}
 
-		# if loot or xp is dropped, then the player is in survival. kill the drops
-		.score Dropped = 0
-		execute if entity @drop run .score Dropped = 1
-		kill @drop
-		execute if entity @xp run .score Dropped = 1
-		kill @xp
-		# if so, summon the appropriate loot for the custom block
-		.if Dropped == 1 run .lambda {
-			.for Block in (BlockNames) {
-				.define ID (BlockID[(Block)])
-				.define Item (SourceItem[(Block)])
-				.define LootTable (LootTable[(Block)])
-				execute if entity @s[nbt={ArmorItems:[{id:"(Item)",tag:{CustomModelData:(ID)}}]}] run loot spawn ~~~ loot (LootTable)
-			}
-		}
-
-		# call custom block break hook
-		.for Block in (HasBreak) {
-			.define ID (BlockID[(Block)])
-			.define Item (SourceItem[(Block)])
-			.define Callback (BreakHook[(Block)])
-			execute if entity @s[nbt={ArmorItems:[{id:"(Item)",tag:{CustomModelData:(ID)}}]}] run .call (Callback)
-		}
-
-		kill @s
+function break_hook {
+	.if ID.GuiseVar >= 1 run .if ID.GuiseVar <= 3 run .lambda {
+		.call core/break
+		.if Dropped.GuiseVar == 1 run loot spawn ~~~ loot ~:core
 	}
-	define VillagerOffset -1.449
-	function enable_click {
-		.json VillagerData {
-			"NoAI": true,
-			"Silent": true,
-			"Tags": ["NetherReactorRightClicker", "JustSpawned"],
-			"ActiveEffects": [
-				{"Id": 10, "Amplifier": 3, "Duration": 2147483647, "ShowParticles": false},
-				{"Id": 14, "Amplifier": 0, "Duration": 2147483647, "ShowParticles": false}
+	.if ID.GuiseVar == 4 {
+		.if Dropped.GuiseVar == 1 run loot spawn ~~~ loot ~:glowing_obsidian
+	}
+}
+loot core {
+	"type": "command",
+	"pools": [{
+		"rolls": 1,
+		"entries": [{
+			"type": "$:item", "name": "$:diamond_ore",
+			"functions": [
+				{"function": "$:set_nbt", "tag": (CoreData.string)}
 			]
-		}
-		execute positioned ~ ~(VillagerOffset) ~ {
-			.define mag 0.202
-			.list pos -(mag) (mag)
-			.for X in (pos) {
-				.for Z in (pos) {
-					summon $:villager ~(X) ~1000 ~(Z) (VillagerData)
-				}
-			}
-		}
-	}
-	function disable_click {
-		execute positioned ~ ~(VillagerOffset) ~ run tp @clickers[distance=..0.5] ~ ~-1000 ~
-	}
-	function empty_spawner {
-		data modify block ~~~ RequiredPlayerRange set value 0
-		data modify block ~~~ SpawnData set value {}
-		data modify block ~~~ SpawnPotentials set value []
-	}
-	json ItemText {
-		"text": "(Text)",
-		"italic": false
-	}
-	for Block in [core,glowing_obsidian] {
-		define ID (BlockID[(Block)])
-		define Item (SourceItem[(Block)])
-		define Text (Text[(Block)])
-		json TagData {
-			"CustomModelData": (ID),
-			"display": {
-				"Name": (string[ItemText])
-			}
-		}
-		loot (Block) {
-			"type": "command",
-			"pools": [{
-				"rolls": 1,
-				"entries": [{
-					"type": "$:item", "name": "(Item)",
-					"functions": [
-						{"function": "$:set_nbt", "tag": (string[TagData])}
-					]
-				}]
-			}]
-		}
-	}
+		}]
+	}]
+}
+loot glowing_obsidian {
+	"type": "command",
+	"pools": [{
+		"rolls": 1,
+		"entries": [{
+			"type": "$:item", "name": "$:crying_obsidian",
+			"functions": [
+				{"function": "$:set_nbt", "tag": (GlowingData.string)}
+			]
+		}]
+	}]
 }
 recipe core {
 	"type": "$:crafting_shaped",
@@ -384,7 +240,7 @@ in core {
 		bossbar set ~:bossbar value 0
 		tag @s add ActiveCore
 		# set red
-		data modify entity @s ArmorItems[3].tag.CustomModelData set value (BlockID[core_active])
+		data modify entity @s ArmorItems[3].tag.CustomModelData set value 2
 		.score IsInfiniteNight = 1
 		.score @s.Reaction = 0
 		.call spire
@@ -405,25 +261,29 @@ in core {
 
 		# glowing obsidian replacing cobblestone
 		.if @s.Reaction == 40 run .lambda {
-			.for X in [-1,0,1] run execute positioned ~(X) ~-1 ~ run .call block/place/glowing_obsidian 
-			.for Z in [-1,1] run execute positioned ~ ~-1 ~(Z) run .call block/place/glowing_obsidian 
+			.score ID.GuiseVar = 4
+			.for X in [-1,0,1] run execute positioned ~(X) ~-1 ~ run .call guise:block/place
+			.for Z in [-1,1] run execute positioned ~ ~-1 ~(Z) run .call guise:block/place
 		}
 		.if @s.Reaction == 60 run .lambda {
+			.score ID.GuiseVar = 4
 			.for X in [-1,1] {
 				.for Z in [-1,1] {
-					execute positioned ~(X) ~ ~(Z) run .call block/place/glowing_obsidian
+					execute positioned ~(X) ~ ~(Z) run .call guise:block/place
 				}
 			}
 		}
 		.if @s.Reaction == 80 run .lambda {
-			.for X in [-1,0,1] run execute positioned ~(X) ~1 ~ run .call block/place/glowing_obsidian 
-			.for Z in [-1,1] run execute positioned ~ ~1 ~(Z) run .call block/place/glowing_obsidian 
+			.score ID.GuiseVar = 4
+			.for X in [-1,0,1] run execute positioned ~(X) ~1 ~ run .call guise:block/place
+			.for Z in [-1,1] run execute positioned ~ ~1 ~(Z) run .call guise:block/place
 		}
 		# gold is replaced
 		.if @s.Reaction == 140 run .lambda {
+			.score ID.GuiseVar = 4
 			.for X in [-1,1] {
 				.for Z in [-1,1] {
-					execute positioned ~(X) ~-1 ~(Z) run .call block/place/glowing_obsidian
+					execute positioned ~(X) ~-1 ~(Z) run .call guise:block/place
 				}
 			}
 		}
@@ -470,7 +330,7 @@ in core {
 		# update to dead
 		tag @s remove ActiveCore
 		# set black
-		data modify entity @s ArmorItems[3].tag.CustomModelData set value (BlockID[core_dead])
+		data modify entity @s ArmorItems[3].tag.CustomModelData set value 3
 		# remove bossbar
 		bossbar set ~:bossbar players
 		execute unless entity @blocks[tag=ActiveCore] run bossbar remove ~:bossbar
@@ -584,93 +444,6 @@ loot rewards {
 	}]
 }
 
-# as @p
-in player {
-	function start_place_checks {
-		tag @s add Checking
-		.score @s.SearchTime = 5
-	}
-	function place_check {
-		.for Block in (BlockNames) {
-			.define Item (SourceItem[(Block)])
-			.define ID (BlockID[(Block)])
-			.define TargetScore (PlaceScore[(Block)])
-			execute if entity @s[scores={HeldBlockID=(ID)}] at @s {
-				.if @s.(TargetScore) > 0 run .call player/place/(Block)
-			}
-		}
-		.score @s.SearchTime --
-		.if @s.SearchTime == 0 run tag @s remove Checking
-	}
-	in place {
-		for Block in (BlockNames) {
-			function (Block) {
-				.score @s.Raytrace = 5000
-				execute anchored eyes run .lambda {
-					.score @s.Raytrace --
-					execute unless block ~~~ (SourceItem[(Block)]) {
-						.if @s.Raytrace > 0 {
-							execute positioned ^ ^ ^0.01 run .recurse
-						}
-					}
-					execute if block ~~~ (SourceItem[(Block)]) run .call block/place/(Block)
-				}
-			}
-		}
-	}
-	function look {
-		# at position of target entity
-
-		# count player as near a core
-		.score @s.IsInRange = 1
-
-		# looking from target block to self, step forward
-		execute facing entity @s eyes positioned ^ ^ ^1 {
-			# Looking with player angle, step back
-			execute rotated as @s positioned ^ ^ ^1 {
-				# If we are close to looking at the block center
-				.define @target @e[type=$:armor_stand,tag=Target,distance=..0.5]
-				execute if entity @target run .lambda {
-					.call player/trace
-					# If definitely looking
-					.if Success == 1 {
-						.score @s.HasLooked ++
-
-						# claim detected right click
-						.if @s.BlockUse > 0 run .score @target.Used ++
-						.score @s.BlockUse = 0
-
-						# If not mining, then send to allow right click
-						.if @s.BlockMine == 0 run {
-							.score @target.Looking ++
-						}
-
-						# Creative Mode insta-mine
-						.unless @s.BlockMine == 0 run execute if entity @s[gamemode=creative] {
-							execute at @target run setblock ~~~ air
-							# Reset mining since a block has been mined
-							.score @s.BlockMine = 0
-						}
-
-						# Attack boost to allow punching to break
-						execute unless entity @s[nbt={ActiveEffects:[{Id:5b}]}] run effect give @s $:strength 1 0 true
-					}
-				}
-			}
-		}
-	}
-	function trace {
-		.score Success = 0
-		.score @s.Raytrace = 5000
-		execute at @s anchored eyes run .lambda {
-			.score @s.Raytrace --
-			execute align xyz positioned ~0.5 ~0.5 ~0.5 if entity @e[type=$:armor_stand,tag=Target,distance=..0.1] run .score Success = 1
-			.if Success == 0 run .if @s.Raytrace > 0 {
-				execute if block ~~~ #~:non_solid positioned ^ ^ ^0.1 run .recurse
-			}
-		}
-	}
-}
 
 # as pigman in main spire room during reaction
 function anger {
@@ -684,41 +457,10 @@ function anger {
 
 
 function craft {
-	.define ID (BlockID[core])
-	.define Item (SourceItem[core])
-	.json Text {
-		"text": "(Text[core])",
-		"italic": false
-	}
-	.json NetherReactorCoreItem {
-		"Item": {
-			"id": "(Item)",
-			"Count": 1,
-			"tag": {
-				"CustomModelData": (ID),
-				"display": {"Name": (string[Text])}
-			}
-		}
-	}
 	kill @irons[limit=1,sort=nearest]
 	kill @s
-	summon $:item ~~~ (NetherReactorCoreItem)
+	loot spawn ~~~ loot ~:core
 	particle $:composter ~~~ 0.25 0.5 0.25 0.5 50 normal
-}
-
-in give {
-	json ItemText {
-		"text": "(Text)",
-		"italic": false
-	}
-	for Block in (BlockNames) {
-		define ID (BlockID[(Block)])
-		define Item (SourceItem[(Block)])
-		define Text (Text[(Block)])
-		function (Block) {
-			give @p (Item){CustomModelData:(ID),display:{Name:(string[ItemText])}}
-		}
-	}
 }
 
 structure nether_spire
