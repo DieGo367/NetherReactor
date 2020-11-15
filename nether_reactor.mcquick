@@ -1,3 +1,5 @@
+if_zip run include guise
+
 pack Adds the Nether Reactor from early versions of Minecraft: Pocket Edition
 icon nether_reactor
 
@@ -26,13 +28,17 @@ define @blocks @e[type=$:armor_stand,tag=GuiseBlock]
 define setWarnMsg data modify storage ~:warn msg set value
 enum BAR CHAT TITLE
 
-# # Custom Block Data
+# Custom Block Data
+define core 501
+define core_active 502
+define core_dead 503
+define glowing_obsidian 504
 json CoreText {
 	"text": "Nether Reactor Core",
 	"italic": false
 }
 json CoreData {
-	"CustomModelData": 1,
+	"CustomModelData": (core),
 	"display": {
 		"Name": (CoreText.string)
 	}
@@ -42,11 +48,12 @@ json GlowingText {
 	"italic": false
 }
 json GlowingData {
-	"CustomModelData": 4,
+	"CustomModelData": (glowing_obsidian),
 	"display": {
 		"Name": (GlowingText.string)
 	}
 }
+
 
 function init {
 	.scoredef
@@ -93,46 +100,46 @@ function tick {
 }
 
 function load_blocks {
-	.json core {
-		"id": 1, "Use": true, "Break": true,
+	.json Core {
+		"id": (core), "Use": true, "Break": true,
 		"SourceItem": "$:diamond_ore",
 		"SourceBlock": "$:spawner",
 		"display": {"Name": (CoreText.string)}
 	}
-	.json core_active {
-		"id": 2, "Use": false, "Break": true,
+	.json Core_active {
+		"id": (core_active), "Use": false, "Break": true,
 		"SourceItem": "$:diamond_ore",
 		"SourceBlock": "$:spawner",
 		"display": {"Name": (CoreText.string)}
 	}
-	.json core_dead {
-		"id": 3, "Use": false, "Break": true,
+	.json Core_dead {
+		"id": (core_dead), "Use": false, "Break": true,
 		"SourceItem": "$:diamond_ore",
 		"SourceBlock": "$:spawner",
 		"display": {"Name": (CoreText.string)}
 	}
-	.json glowing_obsidian {
-		"id": 4, "Use": false, "Break": true,
+	.json Glowing_obsidian {
+		"id": (glowing_obsidian), "Use": false, "Break": true,
 		"SourceItem": "$:crying_obsidian",
 		"SourceBlock": "$:crying_obsidian",
 		"display": {"Name": (GlowingText.string)}
 	}
-	data modify storage guise:blocks list append value (core)
-	data modify storage guise:blocks list append value (core_active)
-	data modify storage guise:blocks list append value (core_dead)
-	data modify storage guise:blocks list append value (glowing_obsidian)
+	data modify storage guise:blocks list append value (Core)
+	data modify storage guise:blocks list append value (Core_active)
+	data modify storage guise:blocks list append value (Core_dead)
+	data modify storage guise:blocks list append value (Glowing_obsidian)
 }
 
 function use_hook {
-	.if ID.GuiseVar == 1 run .call core/activation_check
+	.if ID.GuiseVar == (core) run .call core/activation_check
 }
 
 function break_hook {
-	.if ID.GuiseVar >= 1 run .if ID.GuiseVar <= 3 run .lambda {
+	.if ID.GuiseVar >= (core) run .if ID.GuiseVar <= (core_dead) run .lambda {
 		.call core/break
 		.if Dropped.GuiseVar == 1 run loot spawn ~~~ loot ~:core
 	}
-	.if ID.GuiseVar == 4 {
+	.if ID.GuiseVar == (glowing_obsidian) {
 		.if Dropped.GuiseVar == 1 run loot spawn ~~~ loot ~:glowing_obsidian
 	}
 }
@@ -240,7 +247,7 @@ in core {
 		bossbar set ~:bossbar value 0
 		tag @s add ActiveCore
 		# set red
-		data modify entity @s ArmorItems[3].tag.CustomModelData set value 2
+		data modify entity @s ArmorItems[3].tag.CustomModelData set value (core_active)
 		.score IsInfiniteNight = 1
 		.score @s.Reaction = 0
 		.call spire
@@ -261,12 +268,12 @@ in core {
 
 		# glowing obsidian replacing cobblestone
 		.if @s.Reaction == 40 run .lambda {
-			.score ID.GuiseVar = 4
+			.score ID.GuiseVar = (glowing_obsidian)
 			.for X in [-1,0,1] run execute positioned ~(X) ~-1 ~ run .call guise:block/place
 			.for Z in [-1,1] run execute positioned ~ ~-1 ~(Z) run .call guise:block/place
 		}
 		.if @s.Reaction == 60 run .lambda {
-			.score ID.GuiseVar = 4
+			.score ID.GuiseVar = (glowing_obsidian)
 			.for X in [-1,1] {
 				.for Z in [-1,1] {
 					execute positioned ~(X) ~ ~(Z) run .call guise:block/place
@@ -274,13 +281,13 @@ in core {
 			}
 		}
 		.if @s.Reaction == 80 run .lambda {
-			.score ID.GuiseVar = 4
+			.score ID.GuiseVar = (glowing_obsidian)
 			.for X in [-1,0,1] run execute positioned ~(X) ~1 ~ run .call guise:block/place
 			.for Z in [-1,1] run execute positioned ~ ~1 ~(Z) run .call guise:block/place
 		}
 		# gold is replaced
 		.if @s.Reaction == 140 run .lambda {
-			.score ID.GuiseVar = 4
+			.score ID.GuiseVar = (glowing_obsidian)
 			.for X in [-1,1] {
 				.for Z in [-1,1] {
 					execute positioned ~(X) ~-1 ~(Z) run .call guise:block/place
@@ -330,7 +337,7 @@ in core {
 		# update to dead
 		tag @s remove ActiveCore
 		# set black
-		data modify entity @s ArmorItems[3].tag.CustomModelData set value 3
+		data modify entity @s ArmorItems[3].tag.CustomModelData set value (core_dead)
 		# remove bossbar
 		bossbar set ~:bossbar players
 		execute unless entity @blocks[tag=ActiveCore] run bossbar remove ~:bossbar
