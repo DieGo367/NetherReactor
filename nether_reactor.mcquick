@@ -1,6 +1,6 @@
 if_zip run include guise
 
-pack Adds the Nether Reactor from early versions of Minecraft: Pocket Edition
+pack Adds the Nether Reactor from early MCPE. By DVDo
 icon nether_reactor
 
 namespace minecraft
@@ -54,20 +54,15 @@ json GlowingData {
 	}
 }
 
+tag blocks reactor_base [$:cobblestone,$:blackstone]
+
 
 function init {
 	.scoredef
 	.score WarnLoc = (BAR)
-	.scoredef X
-	.scoredef Y
-	.scoredef Z
-	.scoredef Pitch
-	.scoredef Yaw
 	# core 
+	.scoredef Y
 	.scoredef Reaction
-		# crafting
-		.scoredef OpenedTable minecraft.custom:minecraft.interact_with_crafting_table
-		.scoredef Crafted minecraft.crafted:minecraft.structure_void
 }
 
 function tick {
@@ -77,20 +72,6 @@ function tick {
 			execute if entity @irons[distance=..1] run .call craft
 		}
 	}
-
-	# # new crafting
-	# execute as @a at @s run .if @s.OpenedTable > 0 run .lambda {
-	# 	# todo: fix this so that movement is only detected after a tick of opening
-	# 	.define get run data get entity @s
-	# 	.define add run .score @s.OpenedTable = 0
-	# 	.list Target X Y Z Pitch Yaw
-	# 	.list Data Pos[0] Pos[1] Pos[2] Rotation[0] Rotation[1]
-	# 	.for i in [0,1,2,3,4] {
-	# 		.set Temp (get) (Data[(i)])
-	# 		.unless @s.(Target[(i)]) == Temp (add)
-	# 		.score @s.(Target[(i)]) = Temp
-	# 	}
-	# }
 	
 	# core tick update
 	execute as @blocks[tag=ActiveCore] at @s positioned ~ ~-0.5 ~ run .call core/reaction
@@ -215,27 +196,27 @@ in core {
 		}
 		# cobblestone plus (top and bottom)
 		.for Y in [-1,1] {
-			execute unless block ~ ~(Y) ~ $:cobblestone run (invalidate)
+			execute unless block ~ ~(Y) ~ #~:reactor_base run (invalidate)
 			.for V in [-1,1] {
-				execute unless block ~(V) ~(Y) ~ $:cobblestone run (invalidate)
-				execute unless block ~ ~(Y) ~(V) $:cobblestone run (invalidate)
+				execute unless block ~(V) ~(Y) ~ #~:reactor_base run (invalidate)
+				execute unless block ~ ~(Y) ~(V) #~:reactor_base run (invalidate)
 			}
 		}
 		# 4 cobblestone corners
 		.for X in [-1,1] {
 			.for Z in [-1,1] {
-				execute unless block ~(X) ~ ~(Z) $:cobblestone run (invalidate)
+				execute unless block ~(X) ~ ~(Z) #~:reactor_base run (invalidate)
 			}
 		}
 		# 4 air sides
 		.for V in [-1,1] {
-			execute unless block ~(V) ~ ~ #~:air run (invalidate)
-			execute unless block ~ ~ ~(V) #~:air run (invalidate)
+			execute unless block ~(V) ~ ~ #guise:air run (invalidate)
+			execute unless block ~ ~ ~(V) #guise:air run (invalidate)
 		}
 		# 4 air corners
 		.for X in [-1,1] {
 			.for Z in [-1,1] {
-				execute unless block ~(X) ~1 ~(Z) #~:air run (invalidate)
+				execute unless block ~(X) ~1 ~(Z) #guise:air run (invalidate)
 			}
 		}
 	}
