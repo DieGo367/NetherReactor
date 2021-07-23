@@ -1,7 +1,7 @@
-if_zip run include guise
+include guise.zip
 
-pack Adds the Nether Reactor from early MCPE. By DVDo
-icon nether_reactor
+description Adds the Nether Reactor from early MCPE. By DVDo
+icon nether_reactor.png
 
 namespace minecraft
 tag functions load [nether_reactor:init,guise:load]
@@ -15,17 +15,15 @@ tag functions break_hooks [nether_reactor:break_hook]
 
 
 namespace nether_reactor
-nameglobals NetherReactorVar
+objective NetherReactorVar
 
-define @nearest @e[limit=1,sort=nearest]
-define @item @e[type=$:item]
-define @decayer @item[nbt={Item:{tag:{decayer:1b}}}]
-define @diamonds @item[nbt={Item:{id:"minecraft:diamond",Count:3b}}]
-define @irons @item[nbt={Item:{id:"minecraft:iron_ingot",Count:6b}}]
+@items = @e[type=!:item]
+@decayer = @items[nbt={Item:{tag:{decayer:1b}}}]
+@diamonds = @items[nbt={Item:{id:"minecraft:diamond",Count:3b}}]
+@irons = @items[nbt={Item:{id:"minecraft:iron_ingot",Count:6b}}]
 
-define @blocks @e[type=$:armor_stand,tag=GuiseBlock]
+@blocks = @e[type=!:armor_stand,tag=GuiseBlock]
 
-define setWarnMsg data modify storage ~:warn msg set value
 enum BAR CHAT TITLE
 
 # Custom Block Data
@@ -33,95 +31,95 @@ define core 501
 define core_active 502
 define core_dead 503
 define glowing_obsidian 504
-json CoreText {
+define CoreText {
 	"text": "Nether Reactor Core",
 	"italic": false
 }
-json CoreData {
+define CoreData {
 	"CustomModelData": (core),
 	"display": {
 		"Name": (CoreText.string)
 	}
 }
-json GlowingText {
+define GlowingText {
 	"text": "Glowing Obsidian",
 	"italic": false
 }
-json GlowingData {
+define GlowingData {
 	"CustomModelData": (glowing_obsidian),
 	"display": {
 		"Name": (GlowingText.string)
 	}
 }
 
-tag blocks reactor_base [$:cobblestone,$:blackstone]
+tag blocks reactor_base [!:cobblestone,!:blackstone]
 
 
 function init {
-	.scoredef
-	.score WarnLoc = (BAR)
+	.score
+	WarnLoc = (BAR)
 	# core 
-	.scoredef Y
-	.scoredef Reaction
+	.score Y
+	.score Reaction
 }
 
 function tick {
 	# crafting recipe
-	execute as @diamonds at @s {
-		execute if block ~ ~-1 ~ minecraft:crafting_table {
-			execute if entity @irons[distance=..1] run .call craft
+	> with @diamonds {
+		> if ~ ~-1 ~ minecraft:crafting_table {
+			> if @irons[distance=..1] run .call craft
 		}
 	}
 	
 	# core tick update
-	execute as @blocks[tag=ActiveCore] at @s positioned ~ ~-0.5 ~ run .call core/reaction
+	> with @blocks[tag=ActiveCore] positioned ~ ~-0.5 ~ run .call core/reaction
 
 	# infinite night
-	.if IsInfiniteNight == 1 run .call infinite_night
+	> if IsInfiniteNight == 1 run .call infinite_night
 }
 
 function load_blocks {
-	.json Core {
+	.define Core {
 		"id": (core), "Use": true, "Break": true,
-		"SourceItem": "$:diamond_ore",
-		"SourceBlock": "$:spawner",
+		"SourceItem": "!:diamond_ore",
+		"SourceBlock": "!:spawner",
 		"display": {"Name": (CoreText.string)}
 	}
-	.json Core_active {
+	.define Core_active {
 		"id": (core_active), "Use": false, "Break": true,
-		"SourceItem": "$:diamond_ore",
-		"SourceBlock": "$:spawner",
+		"SourceItem": "!:diamond_ore",
+		"SourceBlock": "!:spawner",
 		"display": {"Name": (CoreText.string)}
 	}
-	.json Core_dead {
+	.define Core_dead {
 		"id": (core_dead), "Use": false, "Break": true,
-		"SourceItem": "$:diamond_ore",
-		"SourceBlock": "$:spawner",
+		"SourceItem": "!:diamond_ore",
+		"SourceBlock": "!:spawner",
 		"display": {"Name": (CoreText.string)}
 	}
-	.json Glowing_obsidian {
+	.define Glowing_obsidian {
 		"id": (glowing_obsidian), "Use": false, "Break": true,
-		"SourceItem": "$:crying_obsidian",
-		"SourceBlock": "$:crying_obsidian",
+		"SourceItem": "!:crying_obsidian",
+		"SourceBlock": "!:crying_obsidian",
 		"display": {"Name": (GlowingText.string)}
 	}
-	data modify storage guise:blocks list append value (Core)
-	data modify storage guise:blocks list append value (Core_active)
-	data modify storage guise:blocks list append value (Core_dead)
-	data modify storage guise:blocks list append value (Glowing_obsidian)
+	$guise:blocks.list append (Core)
+	$guise:blocks.list append (Core_active)
+	$guise:blocks.list append (Core_dead)
+	$guise:blocks.list append (Glowing_obsidian)
 }
 
 function use_hook {
-	.if ID.GuiseVar == (core) run .call core/activation_check
+	> if ID/GuiseVar == (core) run .call core/activation_check
 }
 
 function break_hook {
-	.if ID.GuiseVar >= (core) run .if ID.GuiseVar <= (core_dead) run .lambda {
+	> if ID/GuiseVar >= (core) if ID/GuiseVar <= (core_dead) run .lambda {
 		.call core/break
-		.if Dropped.GuiseVar == 1 run loot spawn ~~~ loot ~:core
+		> if Dropped/GuiseVar == 1 run loot spawn ~~~ loot ~:core
 	}
-	.if ID.GuiseVar == (glowing_obsidian) {
-		.if Dropped.GuiseVar == 1 run loot spawn ~~~ loot ~:glowing_obsidian
+	> if ID/GuiseVar == (glowing_obsidian) {
+		> if Dropped/GuiseVar == 1 run loot spawn ~~~ loot ~:glowing_obsidian
 	}
 }
 loot core {
@@ -129,9 +127,9 @@ loot core {
 	"pools": [{
 		"rolls": 1,
 		"entries": [{
-			"type": "$:item", "name": "$:diamond_ore",
+			"type": "!:item", "name": "!:diamond_ore",
 			"functions": [
-				{"function": "$:set_nbt", "tag": (CoreData.string)}
+				{"function": "!:set_nbt", "tag": (CoreData.string)}
 			]
 		}]
 	}]
@@ -141,265 +139,263 @@ loot glowing_obsidian {
 	"pools": [{
 		"rolls": 1,
 		"entries": [{
-			"type": "$:item", "name": "$:crying_obsidian",
+			"type": "!:item", "name": "!:crying_obsidian",
 			"functions": [
-				{"function": "$:set_nbt", "tag": (GlowingData.string)}
+				{"function": "!:set_nbt", "tag": (GlowingData.string)}
 			]
 		}]
 	}]
 }
 recipe core {
-	"type": "$:crafting_shaped",
+	"type": "!:crafting_shaped",
 	"pattern": [
 		"did",
 		"did",
 		"did"
 	],
 	"key": {
-		"d": {"item": "$:diamond"},
-		"i": {"item": "$:iron_ingot"}
+		"d": {"item": "!:diamond"},
+		"i": {"item": "!:iron_ingot"}
 	},
-	"result": {"item": "$:structure_void"}
+	"result": {"item": "!:structure_void"}
 }
 
 # as @blocks
 in core {
 	function break {
-		bossbar set ~:bossbar players
+		%bossbar|players clear
 	}
 	function activation_check {
-		.set @s.Y run data get entity @s Pos[1]
-		.if @s.Y > 7 run .if @s.Y < 223 run .lambda {
+		@s/Y = @s.Pos[1]
+		> if @s/Y > 7 if @s/Y < 223 run .lambda {
 			.call core/structure_check
-			execute if entity @s[tag=IsValid] run .call core/start
-			execute unless entity @s[tag=IsValid] run (setWarnMsg) "Not the correct pattern!"
+			> if @s[tag=IsValid] run .call core/start
+			> unless @s[tag=IsValid] run $warn.msg = "Not the correct pattern!"
 		}
-		.unless @s.Y > 7 run (setWarnMsg) "The nether reactor needs to be built higher up."
-		.unless @s.Y < 223 run (setWarnMsg) "The nether reactor needs to be built lower down."
+		> unless @s/Y > 7 run $warn.msg = "The nether reactor needs to be built higher up."
+		> unless @s/Y < 223 run $warn.msg = "The nether reactor needs to be built lower down."
 		
-		execute if data storage ~:warn msg run .lambda {
-			.if WarnLoc == (BAR) run title @p actionbar {"text":"","extra":[{"storage":"~:warn","nbt":"msg"}]}
-			.if WarnLoc == (TITLE) run title @p title {"text":"","extra":[{"storage":"~:warn","nbt":"msg"}]}
-			.if WarnLoc == (CHAT) run tellraw @p {"text":"","extra":[{"storage":"~:warn","nbt":"msg"}]}
-			data remove storage ~:warn msg
+		> if $warn.msg run .lambda {
+			> if WarnLoc == (BAR) run title @p actionbar {"text":"","extra":[{"storage":"~:warn","nbt":"msg"}]}
+			> if WarnLoc == (TITLE) run title @p title {"text":"","extra":[{"storage":"~:warn","nbt":"msg"}]}
+			> if WarnLoc == (CHAT) run tellraw @p {"text":"","extra":[{"storage":"~:warn","nbt":"msg"}]}
+			$warn.msg remove
 		}
 	}
 	function structure_check {
 		tag @s add IsValid
-		.define invalidate tag @s remove IsValid
 
 		# 4 gold corners
 		.for X in [-1,1] {
 			.for Z in [-1,1] {
-				execute unless block ~(X) ~-1 ~(Z) $:gold_block run (invalidate)
+				> unless ~(X) ~-1 ~(Z) !:gold_block run tag @s remove IsValid
 			}
 		}
 		# cobblestone plus (top and bottom)
 		.for Y in [-1,1] {
-			execute unless block ~ ~(Y) ~ #~:reactor_base run (invalidate)
+			> unless ~ ~(Y) ~ #~:reactor_base run tag @s remove IsValid
 			.for V in [-1,1] {
-				execute unless block ~(V) ~(Y) ~ #~:reactor_base run (invalidate)
-				execute unless block ~ ~(Y) ~(V) #~:reactor_base run (invalidate)
+				> unless ~(V) ~(Y) ~ #~:reactor_base run tag @s remove IsValid
+				> unless ~ ~(Y) ~(V) #~:reactor_base run tag @s remove IsValid
 			}
 		}
 		# 4 cobblestone corners
 		.for X in [-1,1] {
 			.for Z in [-1,1] {
-				execute unless block ~(X) ~ ~(Z) #~:reactor_base run (invalidate)
+				> unless ~(X) ~ ~(Z) #~:reactor_base run tag @s remove IsValid
 			}
 		}
 		# 4 air sides
 		.for V in [-1,1] {
-			execute unless block ~(V) ~ ~ #guise:air run (invalidate)
-			execute unless block ~ ~ ~(V) #guise:air run (invalidate)
+			> unless ~(V) ~ ~ #guise:air run tag @s remove IsValid
+			> unless ~ ~ ~(V) #guise:air run tag @s remove IsValid
 		}
 		# 4 air corners
 		.for X in [-1,1] {
 			.for Z in [-1,1] {
-				execute unless block ~(X) ~1 ~(Z) #guise:air run (invalidate)
+				> unless ~(X) ~1 ~(Z) #guise:air run tag @s remove IsValid
 			}
 		}
 	}
 	function start {
 		title @a actionbar {"text":"Active!","color":"yellow"}
-		bossbar add ~:bossbar {"text": "Nether Reactor"}
-		bossbar set ~:bossbar color blue
-		bossbar set ~:bossbar max 920
-		bossbar set ~:bossbar value 0
+		%bossbar add {"text": "Nether Reactor"}
+		%bossbar|color = blue
+		%bossbar|max = 920
+		%bossbar = 0
 		tag @s add ActiveCore
 		# set red
-		data modify entity @s ArmorItems[3].tag.CustomModelData set value (core_active)
-		.score IsInfiniteNight = 1
-		.score @s.Reaction = 0
+		@s.ArmorItems[3].tag.CustomModelData = (core_active)
+		IsInfiniteNight = 1
+		@s/Reaction = 0
 		.call spire
 	}
 	function reaction {
-		.score @s.Reaction ++
+		@s/Reaction ++
 		# update bossbar score
-		execute store result bossbar ~:bossbar value run .score @s.Reaction get
+		%bossbar = @s/Reaction
 		# within the main room
-		execute positioned ~-7.5 ~-1 ~-7.5 {
+		> positioned ~-7.5 ~-1 ~-7.5 {
 			# update bossbar player list
-			bossbar set ~:bossbar players @a[dx=14,dy=3,dz=14]
+			%bossbar|players = @a[dx=14,dy=3,dz=14]
 			# hostile pigmen
-			execute as @e[type=$:zombified_piglin,dx=14,dy=3,dz=14] at @s run .call anger
+			> with @e[type=!:zombified_piglin,dx=14,dy=3,dz=14] run .call anger
 		}
 
 		# Reaction steps
 
 		# glowing obsidian replacing cobblestone
-		.if @s.Reaction == 40 run .lambda {
-			.score ID.GuiseVar = (glowing_obsidian)
-			.for X in [-1,0,1] run execute positioned ~(X) ~-1 ~ run .call guise:block/place
-			.for Z in [-1,1] run execute positioned ~ ~-1 ~(Z) run .call guise:block/place
+		> if @s/Reaction == 40 run .lambda {
+			ID/GuiseVar = (glowing_obsidian)
+			.for X in [-1,0,1] run > positioned ~(X) ~-1 ~ run .call guise:block/place
+			.for Z in [-1,1] run > positioned ~ ~-1 ~(Z) run .call guise:block/place
 		}
-		.if @s.Reaction == 60 run .lambda {
-			.score ID.GuiseVar = (glowing_obsidian)
+		> if @s/Reaction == 60 run .lambda {
+			ID/GuiseVar = (glowing_obsidian)
 			.for X in [-1,1] {
 				.for Z in [-1,1] {
-					execute positioned ~(X) ~ ~(Z) run .call guise:block/place
+					> positioned ~(X) ~ ~(Z) run .call guise:block/place
 				}
 			}
 		}
-		.if @s.Reaction == 80 run .lambda {
-			.score ID.GuiseVar = (glowing_obsidian)
-			.for X in [-1,0,1] run execute positioned ~(X) ~1 ~ run .call guise:block/place
-			.for Z in [-1,1] run execute positioned ~ ~1 ~(Z) run .call guise:block/place
+		> if @s/Reaction == 80 run .lambda {
+			ID/GuiseVar = (glowing_obsidian)
+			.for X in [-1,0,1] run > positioned ~(X) ~1 ~ run .call guise:block/place
+			.for Z in [-1,1] run > positioned ~ ~1 ~(Z) run .call guise:block/place
 		}
 		# gold is replaced
-		.if @s.Reaction == 140 run .lambda {
-			.score ID.GuiseVar = (glowing_obsidian)
+		> if @s/Reaction == 140 run .lambda {
+			ID/GuiseVar = (glowing_obsidian)
 			.for X in [-1,1] {
 				.for Z in [-1,1] {
-					execute positioned ~(X) ~-1 ~(Z) run .call guise:block/place
+					> positioned ~(X) ~-1 ~(Z) run .call guise:block/place
 				}
 			}
 		}
 		# item and mob spawns
-		.if @s.Reaction == 200 run .lambda {
-			bossbar set ~:bossbar color red
+		> if @s/Reaction == 200 run .lambda {
+			%bossbar|color = red
 			.call core/spawns 15 15 2
 		}
-		.if @s.Reaction == 260 run .lambda run .call core/spawns 15 15 2
-		.if @s.Reaction == 400 run .lambda run .call core/spawns 15 15 2
-		.if @s.Reaction == 440 run .lambda run .call core/spawns 0 35 1
-		.if @s.Reaction == 500 run .lambda run .call core/spawns 0 40 1
-		.if @s.Reaction == 600 run .lambda run .call core/spawns 0 32 0
-		.if @s.Reaction == 680 run .lambda run .call core/spawns 0 20 0
-		.if @s.Reaction == 720 run .lambda run .call core/spawns 0 24 0
-		.if @s.Reaction == 760 run .lambda run .call core/spawns 0 36 0
-		.if @s.Reaction == 800 run .lambda run .call core/spawns 0 20 0
+		> if @s/Reaction == 260 run .lambda run .call core/spawns 15 15 2
+		> if @s/Reaction == 400 run .lambda run .call core/spawns 15 15 2
+		> if @s/Reaction == 440 run .lambda run .call core/spawns 0 35 1
+		> if @s/Reaction == 500 run .lambda run .call core/spawns 0 40 1
+		> if @s/Reaction == 600 run .lambda run .call core/spawns 0 32 0
+		> if @s/Reaction == 680 run .lambda run .call core/spawns 0 20 0
+		> if @s/Reaction == 720 run .lambda run .call core/spawns 0 24 0
+		> if @s/Reaction == 760 run .lambda run .call core/spawns 0 36 0
+		> if @s/Reaction == 800 run .lambda run .call core/spawns 0 20 0
 		# burning out of obsidian
-		.define clear run execute positioned ~(X) ~(Y) ~(Z) run kill @blocks[distance=..0.1]
-		.if @s.Reaction == 860 run .lambda {
-			bossbar set ~:bossbar color purple
+		> if @s/Reaction == 860 run .lambda {
+			%bossbar|color = purple
 			.define Y 1.5
-			.for X in [-1,0,1] run .for Z in [-1,0,1] (clear)
-			fill ~-1 ~1 ~-1 ~1 ~1 ~1 $:obsidian
+			.for X in [-1,0,1] run .for Z in [-1,0,1] run > positioned ~(X) ~(Y) ~(Z) run kill @blocks[distance=..0.1]
+			fill ~-1 ~1 ~-1 ~1 ~1 ~1 !:obsidian
 		}
-		.if @s.Reaction == 880 run .lambda {
+		> if @s/Reaction == 880 run .lambda {
 			.define Y 0.5
-			.for X in [-1,0,1] run .for Z in [-1,1] (clear)
-			.for X in [0] run .for Z in [-1,1] (clear)
-			fill ~1 ~ ~1 ~1 ~ ~-1 $:obsidian
-			fill ~-1 ~ ~1 ~-1 ~ ~-1 $:obsidian
-			setblock ~ ~ ~1 $:obsidian
-			setblock ~ ~ ~-1 $:obsidian
+			.for X in [-1,0,1] run .for Z in [-1,1] run > positioned ~(X) ~(Y) ~(Z) run kill @blocks[distance=..0.1]
+			.for X in [0] run .for Z in [-1,1] run > positioned ~(X) ~(Y) ~(Z) run kill @blocks[distance=..0.1]
+			fill ~1 ~ ~1 ~1 ~ ~-1 !:obsidian
+			fill ~-1 ~ ~1 ~-1 ~ ~-1 !:obsidian
+			setblock ~ ~ ~1 !:obsidian
+			setblock ~ ~ ~-1 !:obsidian
 		}
-		.if @s.Reaction == 900 run .lambda {
+		> if @s/Reaction == 900 run .lambda {
 			.define Y -0.5
-			.for X in [-1,0,1] run .for Z in [-1,0,1] (clear)
-			fill ~-1 ~-1 ~-1 ~1 ~-1 ~1 $:obsidian
+			.for X in [-1,0,1] run .for Z in [-1,0,1] run > positioned ~(X) ~(Y) ~(Z) run kill @blocks[distance=..0.1]
+			fill ~-1 ~-1 ~-1 ~1 ~-1 ~1 !:obsidian
 		}
 		# end of reaction
-		.if @s.Reaction >= 920 run .call core/end
+		> if @s/Reaction >= 920 run .call core/end
 	}
 	function end {
 		# update to dead
 		tag @s remove ActiveCore
 		# set black
-		data modify entity @s ArmorItems[3].tag.CustomModelData set value (core_dead)
+		@s.ArmorItems[3].tag.CustomModelData = (core_dead)
 		# remove bossbar
-		bossbar set ~:bossbar players
-		execute unless entity @blocks[tag=ActiveCore] run bossbar remove ~:bossbar
+		%bossbar|players clear
+		> unless @blocks[tag=ActiveCore] run bossbar remove ~:bossbar
 		# remove Infinite night
-		.score IsInfiniteNight = 0
+		IsInfiniteNight = 0
 		# structure changes
-		fill ~-1 ~1 ~-1 ~1 ~1 ~1 $:obsidian
-		fill ~1 ~ ~1 ~1 ~ ~-1 $:obsidian
-		fill ~-1 ~ ~1 ~-1 ~ ~-1 $:obsidian
-		setblock ~ ~ ~1 $:obsidian
-		setblock ~ ~ ~-1 $:obsidian
-		fill ~-1 ~-1 ~-1 ~1 ~-1 ~1 $:obsidian
+		fill ~-1 ~1 ~-1 ~1 ~1 ~1 !:obsidian
+		fill ~1 ~ ~1 ~1 ~ ~-1 !:obsidian
+		fill ~-1 ~ ~1 ~-1 ~ ~-1 !:obsidian
+		setblock ~ ~ ~1 !:obsidian
+		setblock ~ ~ ~-1 !:obsidian
+		fill ~-1 ~-1 ~-1 ~1 ~-1 ~1 !:obsidian
 		.call decay_spire
 	}
 	# Reaction functions
 	function spawns takes RNG_Min RNG_Max MobLimit {
 		.do rng
-		.score ItemCount = RNG
-		execute positioned ~ ~-1 ~ run .call core/spawn_items
-		.score ItemCount reset
+		ItemCount = RNG
+		> positioned ~ ~-1 ~ run .call core/spawn_items
+		ItemCount reset
 		# locating pigmen
-		.if MobLimit > 0 run .call core/spawn_mobs
-		.score MobLimit reset
+		> if MobLimit > 0 run .call core/spawn_mobs
+		MobLimit reset
 	}
 	function spawn_items {
-		.if ItemCount > 0 run .lambda {
+		> if ItemCount > 0 run .lambda {
 			.call core/random_spot
-			.define @spot @nearest[type=$:area_effect_cloud,tag=RandomSpot]
-			execute at @spot run loot spawn ~~~ loot ~:rewards
+			@spots = @e[type=!:area_effect_cloud,tag=RandomSpot]
+			> at @spot run loot spawn ~~~ loot ~:rewards
 			kill @spot
-			.score ItemCount --
-			.if ItemCount > 0 run .recurse
+			ItemCount --
+			> if ItemCount > 0 run .recurse
 		}
 	}
 	function spawn_mobs {
-		.score MobCount = 0
-		execute positioned ~-7.5 ~-1 ~-7.5 {
-			execute as @e[type=$:zombified_piglin,dx=14,dy=3,dz=14] run .score MobCount ++
+		MobCount = 0
+		> positioned ~-7.5 ~-1 ~-7.5 {
+			> as @e[type=!:zombified_piglin,dx=14,dy=3,dz=14] run MobCount ++
 		}
-		.if MobCount < 3 run .lambda {
+		> if MobCount < 3 run .lambda {
 			.call core/spawn_mob
-			.score MobCount ++
-			.score MobLimit --
-			.if MobCount < 3 run .if MobLimit > 0 run .recurse
+			MobCount ++
+			MobLimit --
+			> if MobCount < 3 if MobLimit > 0 run .recurse
 		}
-		.score MobCount reset
+		MobCount reset
 	}
 	function spawn_mob {
 		.call core/random_spot
-		.define @spot @nearest[type=$:area_effect_cloud,tag=RandomSpot]
-		execute at @spot run summon $:zombified_piglin ~~~
+		@spots = @e[type=!:area_effect_cloud,tag=RandomSpot]
+		> at @spot run summon !:zombified_piglin ~~~
 		kill @spot
 	}
 	function random_spot {
 		# distance of 3 - 7 blocks, 0.5 steps
 		.call rng 6 14
-		.score Distance = RNG
-		.score Distance ++
+		Distance = RNG
+		Distance ++
 		# angle up to 360 degrees, 5 deg steps
 		.call rng 1 72
-		.score Angle = RNG
+		Angle = RNG
 
-		execute positioned ~ ~-1 ~ rotated 0 0 run .lambda {
-			.score Angle --
-			.if Angle == 0 run .lambda {
-				.score Distance --
-				.if Distance == 0 run .lambda {
-					summon $:area_effect_cloud ~~~ {Duration:2}
-					tag @nearest[type=$:area_effect_cloud] add RandomSpot
+		> positioned ~ ~-1 ~ rotated 0 0 run .lambda {
+			Angle --
+			> if Angle == 0 run .lambda {
+				Distance --
+				> if Distance == 0 run .lambda {
+					summon !:area_effect_cloud ~~~ {Duration:2}
+					tag @e[type=!:area_effect_cloud,limit=1,sort=nearest] add RandomSpot
 				}
-				.if Distance > 0 {
-					execute positioned ^ ^ ^0.5 run .recurse
+				> if Distance > 0 {
+					> positioned ^ ^ ^0.5 run .recurse
 				}
 			}
-			.if Angle > 0 {
-				execute rotated ~5 0 run .recurse
+			> if Angle > 0 {
+				> rotated ~5 0 run .recurse
 			}
 		}
 
-		.score Distance reset
-		.score Angle reset
+		Distance reset
+		Angle reset
 	}
 	
 }
@@ -435,155 +431,132 @@ loot rewards {
 
 # as pigman in main spire room during reaction
 function anger {
-	execute unless data entity @s AngryAt {
-		execute if entity @p[distance=..4] {
-			data modify entity @s AngerTime set value 50
-			data modify entity @s AngryAt set from entity @p[distance=..4] UUID
+	> unless @s.AngryAt {
+		> if @p[distance=..4] {
+			@s.AngerTime = 50
+			@s.AngryAt = @p[distance=..4].UUID
 		}
 	}
 }
 
 
 function craft {
-	kill @irons[limit=1,sort=nearest]
+	kill @iron
 	kill @s
 	loot spawn ~~~ loot ~:core
-	particle $:composter ~~~ 0.25 0.5 0.25 0.5 50 normal
+	particle !:composter ~~~ 0.25 0.5 0.25 0.5 50 normal
 }
 
 structure nether_spire
 function spire {
 	setblock ~ ~-3 ~ minecraft:structure_block{mode:"LOAD",powered:0b,name:"~:nether_spire",posX:-8,posZ:-8}
-	setblock ~ ~-2 ~ $:redstone_block
+	setblock ~ ~-2 ~ !:redstone_block
 }
 
 function decay_spire {
-	.define mark loot spawn (here) loot ~:decay_rng
-	# .define mark summon $:armor_stand (here) {NoGravity:true}
-
 	# outer wall
-	.range Height -1 5
+	.eval Height range(-1, 6)
 	.for Y in (Height) {
-		.define here ~-8 ~(Y) ~-8
-		(mark)
+		loot spawn ~-8 ~(Y) ~-8 loot ~:decay_rng
 	}
-	.range Width -7 8
+	.eval Width range(-7, 9)
 	.for I in (Width) {
 		.eval H (I)/2 + 9
 		.eval H math.ceil((H))
-		.range Height -1 (H)
+		.eval Height range(-1, (H)+1)
 		.for Y in (Height) {
-			.define here ~(I) ~(Y) ~-8
-			(mark)
-			.define here ~-8 ~(Y) ~(I)
-			(mark)
+			loot spawn ~(I) ~(Y) ~-8 loot ~:decay_rng
+			loot spawn ~-8 ~(Y) ~(I) loot ~:decay_rng
 		}
 	}
-	.range Width -7 7
+	.eval Width range(-7, 8)
 	.for I in (Width) {
 		.eval H (I)/2 + 17
 		.eval H math.floor((H))
-		.range Height -1 (H)
+		.eval Height range(-1, (H)+1)
 		.for Y in (Height) {
-			.define here ~(I) ~(Y) ~8
-			(mark)
-			.define here ~8 ~(Y) ~(I)
-			(mark)
+			loot spawn ~(I) ~(Y) ~8 loot ~:decay_rng
+			loot spawn ~8 ~(Y) ~(I) loot ~:decay_rng
 		}
 	}
-	.range Height -1 20
+	.eval Height range(-1, 21)
 	.for Y in (Height) {
-		.define here ~8 ~(Y) ~8
-		(mark)
+		loot spawn ~8 ~(Y) ~8 loot ~:decay_rng
 	}
 
 	# middle wall
-	.range Height 5 22
+	.eval Height range(5, 23)
 	.for Y in (Height) {
-		.define here ~-5 ~(Y) ~-5
-		(mark)
+		loot spawn ~-5 ~(Y) ~-5 loot ~:decay_rng
 	}
-	.range Width -4 5
+	.eval Width range(-4, 6)
 	.for I in (Width) {
 		.eval H 20 - (I)/2
 		.eval H math.ceil((H))
-		.range Height 5 (H)
+		.eval Height range(5, (H)+1)
 		.for Y in (Height) {
-			.define here ~(I) ~(Y) ~-5
-			(mark)
-			.define here ~-5 ~(Y) ~(I)
-			(mark)
+			loot spawn ~(I) ~(Y) ~-5 loot ~:decay_rng
+			loot spawn ~-5 ~(Y) ~(I) loot ~:decay_rng
 		}
 	}
-	.range Width -4 0
+	.eval Width range(-4, 1)
 	.for I in (Width) {
 		.eval H 16 - (I)/2
 		.eval H math.floor((H))
-		.range Height 5 (H)
+		.eval Height range(5, (H)+1)
 		.for Y in (Height) {
-			.define here ~(I) ~(Y) ~5
-			(mark)
-			.define here ~5 ~(Y) ~(I)
-			(mark)
+			loot spawn ~(I) ~(Y) ~5 loot ~:decay_rng
+			loot spawn ~5 ~(Y) ~(I) loot ~:decay_rng
 		}
 	}
-	.range Width 1 4
+	.eval Width range(1, 5)
 	.for I in (Width) {
 		.eval H 15 + (I)/2
 		.eval H math.ceil((H))
-		.range Height 5 (H)
+		.eval Height range(5, (H)+1)
 		.for Y in (Height) {
-			.define here ~(I) ~(Y) ~5
-			(mark)
-			.define here ~5 ~(Y) ~(I)
-			(mark)
+			loot spawn ~(I) ~(Y) ~5 loot ~:decay_rng
+			loot spawn ~5 ~(Y) ~(I) loot ~:decay_rng
 		}
 	}
-	.range Height 5 18
+	.eval Height range(5, 19)
 	.for Y in (Height) {
-		.define here ~5 ~(Y) ~5
-		(mark)
+		loot spawn ~5 ~(Y) ~5 loot ~:decay_rng
 	}
 
 	# inner wall
-	.range Height 11 25
+	.eval Height range(11, 26)
 	.for Y in (Height) {
-		.define here ~-3 ~(Y) ~-3
-		(mark)
+		loot spawn ~-3 ~(Y) ~-3 loot ~:decay_rng
 	}
-	.range Width -2 3
+	.eval Width range(-2, 4)
 	.for I in (Width) {
 		.eval H (I)/2 + 27
 		.eval H math.floor((H))
-		.range Height 11 (H)
+		.eval Height range(11, (H)+1)
 		.for Y in (Height) {
-			.define here ~(I) ~(Y) ~-3
-			(mark)
-			.define here ~-3 ~(Y) ~(I)
-			(mark)
+			loot spawn ~(I) ~(Y) ~-3 loot ~:decay_rng
+			loot spawn ~-3 ~(Y) ~(I) loot ~:decay_rng
 		}
 	}
-	.range Width -2 2
+	.eval Width range(-2, 3)
 	.for I in (Width) {
 		.eval H (I)/2 + 29
 		.eval H math.ceil((H))
-		.range Height 11 (H)
+		.eval Height range(11, (H)+1)
 		.for Y in (Height) {
-			.define here ~(I) ~(Y) ~3
-			(mark)
-			.define here ~3 ~(Y) ~(I)
-			(mark)
+			loot spawn ~(I) ~(Y) ~3 loot ~:decay_rng
+			loot spawn ~3 ~(Y) ~(I) loot ~:decay_rng
 		}
 	}
-	.range Height 11 30
+	.eval Height range(11, 31)
 	.for Y in (Height) {
-		.define here ~3 ~(Y) ~3
-		(mark)
+		loot spawn ~3 ~(Y) ~3 loot ~:decay_rng
 	}
 
 	# decay at marked areas
-	execute as @decayer at @s run .lambda {
-		setblock ~~~ $:air replace
+	> with @decayer run .lambda {
+		setblock ~~~ !:air replace
 		kill @s
 	}
 }
@@ -608,22 +581,22 @@ loot decay_rng {
 }
 
 function infinite_night {
-	.set InfiniteNightTimer run time query daytime
-	.if InfiniteNightTimer >= 18000 run .if InfiniteNightTimer < 18150 run time set midnight
-	.if InfiniteNightTimer < 18000 run time add 100
-	.if InfiniteNightTimer >= 18150 run time add 100
+	> store result InfiniteNightTimer run time query daytime
+	> if InfiniteNightTimer >= 18000 if InfiniteNightTimer < 18150 run /time set midnight
+	> if InfiniteNightTimer < 18000 run time add 100
+	> if InfiniteNightTimer >= 18150 run time add 100
 }
 
 function rng100 {
 	loot spawn ~ 999 ~ loot ~:rng100
-	.define @rng @item[distance=..1,nbt={Item:{tag:{rng:1b}}}]
-	.score RNG = 0
-	execute positioned ~ 999 ~ as @rng run .lambda {
-		.set Temp run data get entity @s Item.Count
-		.score RNG += Temp
+	@rng = @item[distance=..1,nbt={Item:{tag:{rng:1b}}}]
+	RNG = 0
+	> positioned ~ 999 ~ as @rng run .lambda {
+		Temp = @s.Item.Count
+		RNG += Temp
 		kill @s
 	}
-	.score Temp reset
+	Temp reset
 }
 loot rng100 {
 	"type": "command",
@@ -650,13 +623,13 @@ loot rng100 {
 }
 function rng takes RNG_Min RNG_Max {
 	.call rng100
-	.score RNG_Diff = RNG_Max
-	.score RNG_Diff -= RNG_Min
-	.score RNG_Scale = 100
-	.score RNG_Scale /= RNG_Diff
-	.score RNG /= RNG_Scale
-	.score RNG += RNG_Min
-	.score RNG < RNG_Max
-	.score RNG_Diff reset
-	.score RNG_Scale reset
+	RNG_Diff = RNG_Max
+	RNG_Diff -= RNG_Min
+	RNG_Scale = 100
+	RNG_Scale /= RNG_Diff
+	RNG /= RNG_Scale
+	RNG += RNG_Min
+	RNG < RNG_Max
+	RNG_Diff reset
+	RNG_Scale reset
 }

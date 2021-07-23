@@ -1,5 +1,5 @@
-pack In-game splits for the Nether Reactor Core Challenge!
-icon speedrun
+description In-game splits for the Nether Reactor Core Challenge!
+icon speedrun.png
 
 
 namespace minecraft
@@ -7,35 +7,36 @@ tag functions load [nrcc:load]
 tag functions tick [nrcc:tick]
 
 namespace nrcc
-nameglobals NRCCGlobal
+objective NRCCGlobal
 
-define @runner @a[tag=Runner]
-define @armors @e[type=$:armor_stand]
+@runner = @a[tag=Runner]
+@armors = @e[type=!:armor_stand]
 
-define @blocks @e[type=$:armor_stand,tag=GuiseBlock]
+@blocks = @e[type=!:armor_stand,tag=GuiseBlock]
 
-define setPrintMsg data modify storage ~:time_printer PreMsg set value
+macro set_msg takes msg run $time_printer.PreMsg = (msg)
 enum BAR CHAT TITLE
 
 define core 501
 define core_active 502
 define core_dead 503
 
-list Dimensions $:overworld $:the_nether $:the_end
-map DimIDs maps (Dimensions) to [0,1,2]
-map DimNames maps (Dimensions) to [Overworld,Nether,End]
-map DimColors maps (Dimensions) to [green,red,dark_purple]
+define Dimensions [!:overworld, !:the_nether, !:the_end]
+define DimIDs [0, 1, 2]
+define DimNames ["Overworld", "Nether", "End"]
+define DimColors ["green", "red", "dark_purple"]
 
 function load {
-	.scoredef
-	.scoreclr Splits
-	.scoredef Health health
+	.score
+	.scoredelete Splits
+	.score Splits
+	.score Health health
 	# scoreboard objectives setdisplay sidebar Splits
 
 	tag @a remove Runner
 
 	# UI
-	.json startButton {
+	.define startButton {
 		"text": "[Start]",
 		"color": "green",
 		"clickEvent": {
@@ -52,72 +53,72 @@ function load {
 	tellraw @a (startButton)
 }
 function tick {
-	execute as @runner at @s run .lambda {
+	> with @runner run .lambda {
 		# Increase timer
-		.score Time.Splits ++
+		Time/Splits ++
 
 		# Countdown titles
-		.if Time.Splits == -60 run title @s title {"text":"3"}
-		.if Time.Splits == -40 run title @s title {"text":"2"}
-		.if Time.Splits == -20 run title @s title {"text":"1"}
-		.if Time.Splits == 0 run title @s title {"text":"GO!","color":"gold"}
+		> if Time/Splits == -60 run title @s title {"text":"3"}
+		> if Time/Splits == -40 run title @s title {"text":"2"}
+		> if Time/Splits == -20 run title @s title {"text":"1"}
+		> if Time/Splits == 0 run title @s title {"text":"GO!","color":"gold"}
 
 		# in run
-		.if Time.Splits >= 0 run .lambda {
+		> if Time/Splits >= 0 run .lambda {
 			# print timer
-			.call print_time Time.Splits (BAR)
+			.call print_time Time/Splits (BAR)
 
 			# Dimension check
 			.call check_dim
-			.score Temp = CurrDim
-			.score Temp -= LastDim
-			.unless Temp == 0 run .lambda {
-				.score KnownDim = 0
-				.for Dim in (Dimensions) {
-					.if CurrDim == (DimIDs[(Dim)]) run {
-						(setPrintMsg) "{\"text\": \"The (DimNames[(Dim)])\", \"color\": \"(DimColors[(Dim)])\"}"
-						.score KnownDim = 1
+			Temp = CurrDim
+			Temp -= LastDim
+			> unless Temp == 0 run .lambda {
+				KnownDim = 0
+				.for ID in (DimIDs) {
+					> if CurrDim == (ID) {
+						.macro set_msg "{\"text\": \"The ((DimNames[(ID)]))\", \"color\": \"((DimColors[(ID)]))\"}"
+						KnownDim = 1
 					}
 				}
-				.if KnownDim == 0 run (setPrintMsg) "{\"text\": \"Custom Dimension\", \"color\": \"gray\"}"
-				.score LastDim = CurrDim
+				> if KnownDim == 0 run .macro set_msg "{\"text\": \"Custom Dimension\", \"color\": \"gray\"}"
+				LastDim = CurrDim
 				.call split
 			}
-			.score Temp reset
+			Temp reset
 
 			# Item check
-			.if HasCore == 0 {
-				execute if entity @s[nbt={Inventory:[{tag:{CustomModelData:(core)}}]}] run .lambda {
-					(setPrintMsg) "{\"text\": \"Core get\"}"
+			> if HasCore == 0 {
+				> if @s[nbt={Inventory:[{tag:{CustomModelData:(core)}}]}] run .lambda {
+					.macro set_msg "{\"text\": \"Core get\"}"
 					.call split
-					.score HasCore = 1
+					HasCore = 1
 				}
 			}
 
 			# Activation check
-			.if Activated == 0 {
-				execute if entity @blocks[nbt={ArmorItems:[{tag:{CustomModelData:(core_active)}}]}] run .lambda {
-					(setPrintMsg) "{\"text\": \"Activated\"}"
+			> if Activated == 0 {
+				> if @blocks[nbt={ArmorItems:[{tag:{CustomModelData:(core_active)}}]}] run .lambda {
+					.macro set_msg "{\"text\": \"Activated\"}"
 					.call split
-					.score Activated = 1
+					Activated = 1
 				}
 			}
 
 			# Death check
-			.if Activated == 1 {
-				.if @s.Health == 0 run .lambda {
+			> if Activated == 1 {
+				> if @s/Health == 0 run .lambda {
 					title @s title {"text": "You failed...", "color": "red"}
-					(setPrintMsg) "{\"text\": \"Failed\", \"color\": \"red\"}"
-					.call print_time Time.Splits (CHAT)
+					.macro set_msg "{\"text\": \"Failed\", \"color\": \"red\"}"
+					.call print_time Time/Splits (CHAT)
 					.call stop
 				}
 			}
 
 			# Finish check
-			execute if entity @blocks[nbt={ArmorItems:[{tag:{CustomModelData:(core_dead)}}]}] run .lambda {
+			> if @blocks[nbt={ArmorItems:[{tag:{CustomModelData:(core_dead)}}]}] run .lambda {
 				title @s title {"text": "Time!","color": "gold"}
-				(setPrintMsg) "{\"text\": \"Time!\",\"color\": \"gold\"}"
-				.call print_time Time.Splits (CHAT)
+				.macro set_msg "{\"text\": \"Time!\",\"color\": \"gold\"}"
+				.call print_time Time/Splits (CHAT)
 				.call stop
 			}
 		}
@@ -128,80 +129,80 @@ function start {
 	tag @a remove Runner
 	tag @s add Runner
 
-	effect give @s $:slowness 3 255
-	effect give @s $:mining_fatigue 3 255
+	effect give @s !:slowness 3 255
+	effect give @s !:mining_fatigue 3 255
 	
-	.scoreclr Splits
+	.scoredelete Splits
+	.score Splits
 	# scoreboard objectives setdisplay sidebar Splits
-	.score Time.Splits = -61
-	.score SplitCount = 0
+	Time/Splits = -61
+	SplitCount = 0
 	.call check_dim
-	.score LastDim = CurrDim
-	.score HasCore = 0
-	.score Activated = 0
-	.score WarnLoc.NetherReactorVar = (CHAT)
+	LastDim = CurrDim
+	HasCore = 0
+	Activated = 0
+	WarnLoc/NetherReactorVar = (CHAT)
 }
 
 function stop {
 	tag @a remove Runner
-	.score WarnLoc.NetherReactorVar = (BAR)
+	WarnLoc/NetherReactorVar = (BAR)
 }
 
 function check_dim {
-	.for Dim in (Dimensions) {
-		execute in (Dim) as @p[distance=..0] run .score CurrDim = (DimIDs[(Dim)])
+	.for Dim in (Dimensions) index i {
+		> in (Dim) as @p[distance=..0] run CurrDim = (i)
 	}
 }
 
 function split {
-	.score SplitCount ++
-	.range SplitNums 1000
+	SplitCount ++
+	.eval SplitNums range(0, 1001)
 	.for N in (SplitNums) {
-		.if SplitCount == (N) {
-			.score (N):.Splits = Time.Splits
+		> if SplitCount == (N) {
+			scoreboard players operation (N): Splits = Time Splits
 		}
 	}
-	.call print_time Time.Splits (CHAT)
+	.call print_time Time/Splits (CHAT)
 }
 
 function calc_time takes Value {
 	# Get minutes
-	.score Minutes = Value
-	.score Scalar = 1200
-	.score Minutes /= Scalar
-	.score Subtractor = Minutes
-	.score Subtractor *= Scalar
-	.score Value -= Subtractor
+	Minutes = Value
+	Scalar = 1200
+	Minutes /= Scalar
+	Subtractor = Minutes
+	Subtractor *= Scalar
+	Value -= Subtractor
 	# Get seconds
-	.score Seconds = Value
-	.score Scalar = 20
-	.score Seconds /= Scalar
-	.score Subtractor = Seconds
-	.score Subtractor *= Scalar
-	.score Value -= Subtractor
+	Seconds = Value
+	Scalar = 20
+	Seconds /= Scalar
+	Subtractor = Seconds
+	Subtractor *= Scalar
+	Value -= Subtractor
 	# Get sub seconds
-	.score Scalar = 5
-	.score Value *= Scalar
+	Scalar = 5
+	Value *= Scalar
 	# cleanup
-	.score Scalar reset
-	.score Subtractor reset
+	Scalar reset
+	Subtractor reset
 }
 function print_time takes Value PrintLoc {
 	.do calc_time
 
 	# update suffixes
-	.define store data modify storage ~:time_printer
-	.if Seconds < 10 run (store) SecMark set value ":0"
-	.unless Seconds < 10 run (store) SecMark set value ":"
-	.if Value < 10 run (store) SubSecMark set value ":0"
-	.unless Value < 10 run (store) SubSecMark set value ":"
-	execute if data storage ~:time_printer PreMsg run data modify storage ~:time_printer PreMsgMark set value ": "
-	execute unless data storage ~:time_printer PreMsg run {
-		data modify storage ~:time_printer PreMsgMark set value ""
-		data modify storage ~:time_printer PreMsg set value ""
+	> if Seconds < 10 run $time_printer.SecMark = ":0"
+	> unless Seconds < 10 run $time_printer.SecMark = ":"
+	> if Value < 10 run $time_printer.SubSecMark = ":0"
+	> unless Value < 10 run $time_printer.SubSecMark = ":"
+	> if $time_printer.PreMsg run $time_printer.PreMsgMark = ": "
+	> unless $time_printer.PreMsg {
+		$time_printer.PreMsgMark = ""
+		$time_printer.PreMsg = ""
 	}
 
-	.json timeText {
+	.define timeText {
 		"text": "",
 		"color": "aqua",
 		"extra": [
@@ -225,10 +226,10 @@ function print_time takes Value PrintLoc {
 	}
 
 	# print
-	.if PrintLoc == (BAR) run title @s actionbar (timeText)
-	.if PrintLoc == (TITLE) run title @s title (timeText)
-	.if PrintLoc == (CHAT) run tellraw @s (timeText)
+	> if PrintLoc == (BAR) run title @s actionbar (timeText)
+	> if PrintLoc == (TITLE) run title @s title (timeText)
+	> if PrintLoc == (CHAT) run tellraw @s (timeText)
 
 	# cleanup
-	data remove storage ~:time_printer PreMsg
+	$time_printer.PreMsg remove
 }
