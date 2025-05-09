@@ -1,635 +1,557 @@
-include guise.zip
-
-description Adds the Nether Reactor from early MCPE. By DVDo
+description Adds the Nether Reactor from early MCPE. By DVdo
 icon nether_reactor.png
 
 namespace minecraft
-tag functions load [nether_reactor:init,guise:load]
-tag functions tick [nether_reactor:tick,guise:tick]
-
-namespace guise
-declare block/place
-tag functions load_blocks [nether_reactor:load_blocks]
-tag functions use_hooks [nether_reactor:use_hook]
-tag functions break_hooks [nether_reactor:break_hook]
-
+tag function load append nether_reactor:init
+tag function tick append nether_reactor:tick
 
 namespace nether_reactor
-objective NetherReactorVar
 
-@items = @e[type=!:item]
-@decayer = @items[nbt={Item:{tag:{decayer:1b}}}]
-@diamonds = @items[nbt={Item:{id:"minecraft:diamond",Count:3b}}]
-@irons = @items[nbt={Item:{id:"minecraft:iron_ingot",Count:6b}}]
+alias @items @e[type=:item]
+alias @item @n[type=:item]
+alias @decayer @items[nbt={Item>components>"minecraft:custom_data">"nether_reactor:decay":1b}]
 
-@blocks = @e[type=!:armor_stand,tag=GuiseBlock]
+alias @blocks @e[type=:item_display,nbt={data>"nether_reactor:block":1b}]
+alias @block  @n[type=:item_display,nbt={data>"nether_reactor:block":1b}]
+alias @display @block[distance=..0.01]
+alias @hitbox @n[type=:interaction,nbt={data>"nether_reactor:hitbox":1b},distance=..0.01]
+
+alias @reacting @blocks[scores={nether_reactor__step=0..}]
+alias @spot @n[type=:marker,nbt={data>"nether_reactor:spot":1b}]
 
 enum BAR CHAT TITLE
 
-# Custom Block Data
-define core 501
-define core_active 502
-define core_dead 503
-define glowing_obsidian 504
-define CoreText {
-	"text": "Nether Reactor Core",
-	"italic": false
+var item_core {
+	"minecraft:item_name": "Nether Reactor Core"
+	"minecraft:item_model": ~:nether_reactor_core
+	"minecraft:max_stack_size": 64
+	"!minecraft:max_damage": {}
+	"minecraft:custom_data">"nether_reactor:block_id": ~:nether_reactor_core
 }
-define CoreData {
-	"CustomModelData": (core),
-	"display": {
-		"Name": (CoreText.string)
-	}
+var item_glowing_obsidian {
+	"minecraft:item_name": "Glowing Obsidian"
+	"minecraft:item_model": ~:glowing_obsidian
+	"minecraft:max_stack_size": 64
+	"!minecraft:max_damage": {}
+	"minecraft:custom_data">"nether_reactor:block_id": ~:glowing_obsidian
+	"minecraft:rarity": uncommon
 }
-define GlowingText {
-	"text": "Glowing Obsidian",
-	"italic": false
-}
-define GlowingData {
-	"CustomModelData": (glowing_obsidian),
-	"display": {
-		"Name": (GlowingText.string)
-	}
-}
-
-tag blocks reactor_base [!:cobblestone,!:blackstone]
-
-
-function init {
-	.score
-	WarnLoc = (BAR)
-	# core 
-	.score Y
-	.score Reaction
-}
-
-function tick {
-	# crafting recipe
-	> with @diamonds {
-		> if ~ ~-1 ~ minecraft:crafting_table {
-			> if @irons[distance=..1] run .call craft
-		}
-	}
-	
-	# core tick update
-	> with @blocks[tag=ActiveCore] positioned ~ ~-0.5 ~ run .call core/reaction
-
-	# infinite night
-	> if IsInfiniteNight == 1 run .call infinite_night
-}
-
-function load_blocks {
-	.define Core {
-		"id": (core), "Use": true, "Break": true,
-		"SourceItem": "!:diamond_ore",
-		"SourceBlock": "!:spawner",
-		"display": {"Name": (CoreText.string)}
-	}
-	.define Core_active {
-		"id": (core_active), "Use": false, "Break": true,
-		"SourceItem": "!:diamond_ore",
-		"SourceBlock": "!:spawner",
-		"display": {"Name": (CoreText.string)}
-	}
-	.define Core_dead {
-		"id": (core_dead), "Use": false, "Break": true,
-		"SourceItem": "!:diamond_ore",
-		"SourceBlock": "!:spawner",
-		"display": {"Name": (CoreText.string)}
-	}
-	.define Glowing_obsidian {
-		"id": (glowing_obsidian), "Use": false, "Break": true,
-		"SourceItem": "!:crying_obsidian",
-		"SourceBlock": "!:crying_obsidian",
-		"display": {"Name": (GlowingText.string)}
-	}
-	$guise:blocks.list append (Core)
-	$guise:blocks.list append (Core_active)
-	$guise:blocks.list append (Core_dead)
-	$guise:blocks.list append (Glowing_obsidian)
-}
-
-function use_hook {
-	> if ID/GuiseVar == (core) run .call core/activation_check
-}
-
-function break_hook {
-	> if ID/GuiseVar >= (core) if ID/GuiseVar <= (core_dead) run .lambda {
-		.call core/break
-		> if Dropped/GuiseVar == 1 run loot spawn ~~~ loot ~:core
-	}
-	> if ID/GuiseVar == (glowing_obsidian) {
-		> if Dropped/GuiseVar == 1 run loot spawn ~~~ loot ~:glowing_obsidian
-	}
-}
-loot core {
-	"type": "command",
-	"pools": [{
-		"rolls": 1,
-		"entries": [{
-			"type": "!:item", "name": "!:diamond_ore",
-			"functions": [
-				{"function": "!:set_nbt", "tag": (CoreData.string)}
-			]
+loot_table nether_reactor_core {
+	type: command
+	pools: [{
+		rolls: 1
+		entries: [{
+			type: :item, name: :warped_fungus_on_a_stick
+			functions: [{
+				function: :set_components
+				components: &(item_core)
+			}]
 		}]
 	}]
 }
-loot glowing_obsidian {
-	"type": "command",
-	"pools": [{
-		"rolls": 1,
-		"entries": [{
-			"type": "!:item", "name": "!:crying_obsidian",
-			"functions": [
-				{"function": "!:set_nbt", "tag": (GlowingData.string)}
-			]
+loot_table glowing_obsidian {
+	type: command
+	pools: [{
+		rolls: 1,
+		entries: [{
+			type: :item, name: :warped_fungus_on_a_stick
+			functions: [{
+				function: :set_components
+				components: &(item_glowing_obsidian)
+			}]
 		}]
 	}]
 }
 recipe core {
-	"type": "!:crafting_shaped",
-	"pattern": [
-		"did",
-		"did",
-		"did"
-	],
-	"key": {
-		"d": {"item": "!:diamond"},
-		"i": {"item": "!:iron_ingot"}
-	},
-	"result": {"item": "!:structure_void"}
+	type: :crafting_shaped
+	pattern: [
+		idi
+		idi
+		idi
+	]
+	key>d: :diamond
+	key>i: :iron_ingot
+	result>id: :warped_fungus_on_a_stick
+	result>components: &(item_core)
 }
 
-# as @blocks
-in core {
-	function break {
-		%bossbar|players clear
-	}
-	function activation_check {
-		@s/Y = @s.Pos[1]
-		> if @s/Y > 7 if @s/Y < 223 run .lambda {
-			.call core/structure_check
-			> if @s[tag=IsValid] run .call core/start
-			> unless @s[tag=IsValid] run $warn.msg = "Not the correct pattern!"
-		}
-		> unless @s/Y > 7 run $warn.msg = "The nether reactor needs to be built higher up."
-		> unless @s/Y < 223 run $warn.msg = "The nether reactor needs to be built lower down."
-		
-		> if $warn.msg run .lambda {
-			> if WarnLoc == (BAR) run title @p actionbar {"text":"","extra":[{"storage":"~:warn","nbt":"msg"}]}
-			> if WarnLoc == (TITLE) run title @p title {"text":"","extra":[{"storage":"~:warn","nbt":"msg"}]}
-			> if WarnLoc == (CHAT) run tellraw @p {"text":"","extra":[{"storage":"~:warn","nbt":"msg"}]}
-			$warn.msg remove
-		}
-	}
-	function structure_check {
-		tag @s add IsValid
+tag block reactor_base append :cobblestone :cobbled_deepslate :blackstone
 
-		# 4 gold corners
-		.for X in [-1,1] {
-			.for Z in [-1,1] {
-				> unless ~(X) ~-1 ~(Z) !:gold_block run tag @s remove IsValid
-			}
-		}
-		# cobblestone plus (top and bottom)
-		.for Y in [-1,1] {
-			> unless ~ ~(Y) ~ #~:reactor_base run tag @s remove IsValid
-			.for V in [-1,1] {
-				> unless ~(V) ~(Y) ~ #~:reactor_base run tag @s remove IsValid
-				> unless ~ ~(Y) ~(V) #~:reactor_base run tag @s remove IsValid
-			}
-		}
-		# 4 cobblestone corners
-		.for X in [-1,1] {
-			.for Z in [-1,1] {
-				> unless ~(X) ~ ~(Z) #~:reactor_base run tag @s remove IsValid
-			}
-		}
-		# 4 air sides
-		.for V in [-1,1] {
-			> unless ~(V) ~ ~ #guise:air run tag @s remove IsValid
-			> unless ~ ~ ~(V) #guise:air run tag @s remove IsValid
-		}
-		# 4 air corners
-		.for X in [-1,1] {
-			.for Z in [-1,1] {
-				> unless ~(X) ~1 ~(Z) #guise:air run tag @s remove IsValid
-			}
-		}
-	}
-	function start {
-		title @a actionbar {"text":"Active!","color":"yellow"}
-		%bossbar add {"text": "Nether Reactor"}
-		%bossbar|color = blue
-		%bossbar|max = 920
-		%bossbar = 0
-		tag @s add ActiveCore
-		# set red
-		@s.ArmorItems[3].tag.CustomModelData = (core_active)
-		IsInfiniteNight = 1
-		@s/Reaction = 0
-		.call spire
-	}
-	function reaction {
-		@s/Reaction ++
-		# update bossbar score
-		%bossbar = @s/Reaction
-		# within the main room
-		> positioned ~-7.5 ~-1 ~-7.5 {
-			# update bossbar player list
-			%bossbar|players = @a[dx=14,dy=3,dz=14]
-			# hostile pigmen
-			> with @e[type=!:zombified_piglin,dx=14,dy=3,dz=14] run .call anger
-		}
 
-		# Reaction steps
+function init
+	&init
+	&init nether_reactor__used minecraft.used:minecraft.warped_fungus_on_a_stick
+	&init nether_reactor__step
+	# settings
+	.unless <warn>.loc run <warn>.loc = "actionbar"
+	# database
+	<blocks>."nether_reactor:nether_reactor_core" = {
+		components: &(item_core)
+		displayItem: :diamond_ore
+		baseBlock: :spawner
+		interact: true
+	}
+	<blocks>."nether_reactor:glowing_obsidian" = {
+		components: &(item_glowing_obsidian)
+		displayItem: :crying_obsidian
+		baseBlock: :crying_obsidian
+	}
 
-		# glowing obsidian replacing cobblestone
-		> if @s/Reaction == 40 run .lambda {
-			ID/GuiseVar = (glowing_obsidian)
-			.for X in [-1,0,1] run > positioned ~(X) ~-1 ~ run .call guise:block/place
-			.for Z in [-1,1] run > positioned ~ ~-1 ~(Z) run .call guise:block/place
-		}
-		> if @s/Reaction == 60 run .lambda {
-			ID/GuiseVar = (glowing_obsidian)
-			.for X in [-1,1] {
-				.for Z in [-1,1] {
-					> positioned ~(X) ~ ~(Z) run .call guise:block/place
-				}
-			}
-		}
-		> if @s/Reaction == 80 run .lambda {
-			ID/GuiseVar = (glowing_obsidian)
-			.for X in [-1,0,1] run > positioned ~(X) ~1 ~ run .call guise:block/place
-			.for Z in [-1,1] run > positioned ~ ~1 ~(Z) run .call guise:block/place
-		}
-		# gold is replaced
-		> if @s/Reaction == 140 run .lambda {
-			ID/GuiseVar = (glowing_obsidian)
-			.for X in [-1,1] {
-				.for Z in [-1,1] {
-					> positioned ~(X) ~-1 ~(Z) run .call guise:block/place
-				}
-			}
-		}
-		# item and mob spawns
-		> if @s/Reaction == 200 run .lambda {
-			%bossbar|color = red
-			.call core/spawns 15 15 2
-		}
-		> if @s/Reaction == 260 run .lambda run .call core/spawns 15 15 2
-		> if @s/Reaction == 400 run .lambda run .call core/spawns 15 15 2
-		> if @s/Reaction == 440 run .lambda run .call core/spawns 0 35 1
-		> if @s/Reaction == 500 run .lambda run .call core/spawns 0 40 1
-		> if @s/Reaction == 600 run .lambda run .call core/spawns 0 32 0
-		> if @s/Reaction == 680 run .lambda run .call core/spawns 0 20 0
-		> if @s/Reaction == 720 run .lambda run .call core/spawns 0 24 0
-		> if @s/Reaction == 760 run .lambda run .call core/spawns 0 36 0
-		> if @s/Reaction == 800 run .lambda run .call core/spawns 0 20 0
-		# burning out of obsidian
-		> if @s/Reaction == 860 run .lambda {
-			%bossbar|color = purple
-			.define Y 1.5
-			.for X in [-1,0,1] run .for Z in [-1,0,1] run > positioned ~(X) ~(Y) ~(Z) run kill @blocks[distance=..0.1]
-			fill ~-1 ~1 ~-1 ~1 ~1 ~1 !:obsidian
-		}
-		> if @s/Reaction == 880 run .lambda {
-			.define Y 0.5
-			.for X in [-1,0,1] run .for Z in [-1,1] run > positioned ~(X) ~(Y) ~(Z) run kill @blocks[distance=..0.1]
-			.for X in [0] run .for Z in [-1,1] run > positioned ~(X) ~(Y) ~(Z) run kill @blocks[distance=..0.1]
-			fill ~1 ~ ~1 ~1 ~ ~-1 !:obsidian
-			fill ~-1 ~ ~1 ~-1 ~ ~-1 !:obsidian
-			setblock ~ ~ ~1 !:obsidian
-			setblock ~ ~ ~-1 !:obsidian
-		}
-		> if @s/Reaction == 900 run .lambda {
-			.define Y -0.5
-			.for X in [-1,0,1] run .for Z in [-1,0,1] run > positioned ~(X) ~(Y) ~(Z) run kill @blocks[distance=..0.1]
-			fill ~-1 ~-1 ~-1 ~1 ~-1 ~1 !:obsidian
-		}
-		# end of reaction
-		> if @s/Reaction >= 920 run .call core/end
-	}
-	function end {
-		# update to dead
-		tag @s remove ActiveCore
-		# set black
-		@s.ArmorItems[3].tag.CustomModelData = (core_dead)
-		# remove bossbar
-		%bossbar|players clear
-		> unless @blocks[tag=ActiveCore] run bossbar remove ~:bossbar
-		# remove Infinite night
-		IsInfiniteNight = 0
-		# structure changes
-		fill ~-1 ~1 ~-1 ~1 ~1 ~1 !:obsidian
-		fill ~1 ~ ~1 ~1 ~ ~-1 !:obsidian
-		fill ~-1 ~ ~1 ~-1 ~ ~-1 !:obsidian
-		setblock ~ ~ ~1 !:obsidian
-		setblock ~ ~ ~-1 !:obsidian
-		fill ~-1 ~-1 ~-1 ~1 ~-1 ~1 !:obsidian
-		.call decay_spire
-	}
-	# Reaction functions
-	function spawns takes RNG_Min RNG_Max MobLimit {
-		.do rng
-		ItemCount = RNG
-		> positioned ~ ~-1 ~ run .call core/spawn_items
-		ItemCount reset
-		# locating pigmen
-		> if MobLimit > 0 run .call core/spawn_mobs
-		MobLimit reset
-	}
-	function spawn_items {
-		> if ItemCount > 0 run .lambda {
-			.call core/random_spot
-			@spots = @e[type=!:area_effect_cloud,tag=RandomSpot]
-			> at @spot run loot spawn ~~~ loot ~:rewards
-			kill @spot
-			ItemCount --
-			> if ItemCount > 0 run .recurse
-		}
-	}
-	function spawn_mobs {
-		MobCount = 0
-		> positioned ~-7.5 ~-1 ~-7.5 {
-			> as @e[type=!:zombified_piglin,dx=14,dy=3,dz=14] run MobCount ++
-		}
-		> if MobCount < 3 run .lambda {
-			.call core/spawn_mob
-			MobCount ++
-			MobLimit --
-			> if MobCount < 3 if MobLimit > 0 run .recurse
-		}
-		MobCount reset
-	}
-	function spawn_mob {
-		.call core/random_spot
-		@spots = @e[type=!:area_effect_cloud,tag=RandomSpot]
-		> at @spot run summon !:zombified_piglin ~~~
-		kill @spot
-	}
-	function random_spot {
-		# distance of 3 - 7 blocks, 0.5 steps
-		.call rng 6 14
-		Distance = RNG
-		Distance ++
-		# angle up to 360 degrees, 5 deg steps
-		.call rng 1 72
-		Angle = RNG
-
-		> positioned ~ ~-1 ~ rotated 0 0 run .lambda {
-			Angle --
-			> if Angle == 0 run .lambda {
-				Distance --
-				> if Distance == 0 run .lambda {
-					summon !:area_effect_cloud ~~~ {Duration:2}
-					tag @e[type=!:area_effect_cloud,limit=1,sort=nearest] add RandomSpot
-				}
-				> if Distance > 0 {
-					> positioned ^ ^ ^0.5 run .recurse
-				}
-			}
-			> if Angle > 0 {
-				> rotated ~5 0 run .recurse
-			}
-		}
-
-		Distance reset
-		Angle reset
-	}
+function tick
+	# place blocks
+	.from @a[scores={nether_reactor__used=1..}]
+		player/place_check()
+		@s#nether_reactor__used = 0
 	
+	# standard block behavior
+	.from @blocks run block/tick()
+
+	# core tick update
+	.from @reacting positioned ~ ~-0.5 ~ run core/reaction()
+
+	# infinite night
+	.if <night>.enabled run infinite_night()
+
+function message(<warn>.msg)
+	.if <warn>.{loc:"actionbar"} run title @p actionbar {storage: ~:warn, nbt: msg, interpret: true}
+	.if <warn>.{loc:"title"} run title @p title {storage: ~:warn, nbt: msg, interpret: true}
+	.if <warn>.{loc:"chat"} run tellraw @p {storage: ~:warn, nbt: msg, interpret: true}
+
+tag item tools append #:axes #:hoes #:pickaxes #:shovels #:swords :trident
+predicate player/mainhand_has_use {
+	# if any of the sub terms match, the item is considered useless, so it can not be useful
+	condition: inverted
+	term: {
+		condition: any_of
+		terms: [
+			{
+				condition: entity_properties
+				entity: this
+				predicate>equipment>mainhand>items: #~:tools
+			}
+			{
+				condition: entity_properties
+				entity: this
+				predicate>equipment>mainhand>count: 0
+			}
+		]
+	}
 }
-loot rewards {
-	"type": "command",
-	"pools": [{
-		"rolls": 1,
-		"entries": [
-			{"type": "minecraft:item", "name": "minecraft:red_mushroom", "weight": 1},
-			{"type": "minecraft:item", "name": "minecraft:brown_mushroom", "weight": 1},
-			{"type": "minecraft:item", "name": "minecraft:cactus", "weight": 1},
+predicate player/holding_shift {
+	condition: entity_properties
+	entity: this
+	predicate>type_specific: {
+		type: player
+		input>sneak: true
+	}
+}
+function player/place_check
+	<item>.mainhand = @s.SelectedItem.components."minecraft:custom_data"."nether_reactor:block_id"
+	.unless <item>.mainhand unless ~:player/mainhand_has_use?
+		<item>.offhand = @s.equipment.offhand.components."minecraft:custom_data"."nether_reactor:block_id"
+
+	.if <item>.mainhand run <item>.used = <item>.mainhand
+	.if <item>.offhand  run <item>.used = <item>.offhand
+	.if <item>.used run player/place_trace()
+
+	&del <item>.mainhand
+	&del <item>.offhand
+	&del <item>.used
+function player/place_trace
+	raytrace = 500
+	placed ?= .anchored eyes =>
+		raytrace--
+		.if raytrace <= 0
+			return fail
+		.if ^ ^ ^0.01 #:replaceable positioned ^ ^ ^0.01
+			return run &recurse
+		block/place(<item>.used)
+		return 1
+	.if placed = true unless @s[gamemode=creative]
+		.if <item>.mainhand run item modify entity @s weapon.mainhand {function: :set_count, count: -1, add: true}
+		.if <item>.offhand  run item modify entity @s weapon.offhand  {function: :set_count, count: -1, add: true}
+function player/sees_block
+	&alias @b @block[tag=nether_reactor__track]
+	# at tagged block
+	.facing @s eyes pos ^ ^ ^1
+		.rotated @s pos ^ ^ ^1
+			.if @b[distance=..0.7] =>
+				raytrace = 500
+				.at @s anchored eyes =>
+					raytrace--
+					.if raytrace <= 0
+						return fail
+					.if ^ ^ ^0.01 #:replaceable positioned ^ ^ ^0.01
+						return run &recurse
+					.pos ^ ^ ^0.01 align xyz pos ~0.5 ~0.5 ~0.5 if @b[distance=..0.01]
+						seen = true
+
+
+function block/place(<place>.block.id)
+	<place>.block $=> $data modify storage ~:place block set from storage ~:blocks $(id)
+	.align xyz pos ~0.5 ~0.5 ~0.5 summon :item_display =>
+		@s.data."nether_reactor:block" = true
+		@s.item.id = <place>.block.displayItem
+		@s.item.components = <place>.block.components
+		@s.transformation.scale = [1.001f, 1.001f, 1.001f]
+		<place>.block $=> $setblock ~~~ $(baseBlock)
+		.if <place>.block.interact
+			@s.data."nether_reactor:interact" = true
+			block/summon_interact()
+	&del <place>.block
+function block/tick
+	.if ~~~ #:air
+		block/broken()
+		.if @s.data."nether_reactor:interact" pos ~ ~-0.501 ~ run kill @hitbox
+		kill @s
+		return fail
+	.if @s.data."nether_reactor:interact" pos ~ ~-0.501 ~
+		block/tick_interact()
+function block/summon_interact
+	.at @s run summon :interaction ~ ~-0.501 ~ {
+		data>"nether_reactor:hitbox": true
+		width: 1.002f
+		height: 1.002f
+		response: true
+	}
+function block/tick_interact
+	# check if we need to hide the interact
+	tag @s add nether_reactor__track
+	seen = false
+	.at @s as @a[distance=..7] if ~:player/holding_shift? run player/sees_block()
+	.if seen = false if @s.data."nether_reactor:mined" at @s as @a[distance=..7] unless ~:player/holding_shift? run player/sees_block()
+	tag @s remove nether_reactor__track
+
+	.if seen = true run kill @hitbox
+	.if seen = false
+		.unless @hitbox run block/summon_interact()
+		&del @s.data."nether_reactor:mined"
+
+	.as @hitbox
+		.if @s.interaction
+			.pos ~ ~0.501 ~ from @display run block/interacted()
+			&del @s.interaction
+		.if @s.attack
+			.on attacker if @s[gamemode=creative] pos ~ ~0.501 ~
+				setblock ~~~ :air
+				kill @display
+			.on attacker unless @s[gamemode=creative] pos ~ ~0.501 ~
+				@display.data."nether_reactor:mined" = true
+			kill @s
+function block/broken
+	.align xyz
+		xpKill := kill @e[type=:experience_orb,dx=0,dy=0,dz=0]
+		itemKill := kill @e[type=:item,dx=0,dy=0,dz=0]
+	itemKill += xpKill
+	.if itemKill > 0
+		<drop>.id = @s.item.components."minecraft:custom_data"."nether_reactor:block_id"
+		<drop> $=> $loot spawn ~~~ loot $(id)
+	
+	.if @s[nbt={item>components>"minecraft:custom_data">"nether_reactor:block_id":~:nether_reactor_core}]
+		core/break()
+function block/interacted
+	.if @s[nbt={item>components>"minecraft:custom_data">"nether_reactor:block_id":~:nether_reactor_core}]
+		core/activation_check()
+function block/remove()
+	setblock ~~~ :air
+	.align xyz
+		.pos ~0.5 ~0.5 ~0.5 run kill @display
+		.pos ~0.5 ~-0.001 ~0.5 run kill @hitbox
+
+function core/activation_check
+	y = @s.Pos[1]
+	.if y > 7 if y < 223 =>
+		valid ?= core/structure_check()
+		.if valid = true run core/start()
+		.if valid = false run message("Not the correct pattern!")
+	.unless y > 7 run message("The nether reactor needs to be built higher up.")
+	.unless y < 223 run message("The nether reactor needs to be built lower down.")
+function core/structure_check
+	# 4 gold corners
+	&for X in [-1,1]
+		&for Z in [-1,1]
+			.unless ~&(X) ~-1 ~&(Z) :gold_block run return fail
+	# cobblestone plus (top and bottom)
+	&for Y in [-1,1]
+		.unless ~ ~&(Y) ~ #~:reactor_base run return fail
+		&for V in [-1,1]
+			.unless ~&(V) ~&(Y) ~ #~:reactor_base run return fail
+			.unless ~ ~&(Y) ~&(V) #~:reactor_base run return fail
+	# 4 cobblestone corners
+	&for X in [-1,1]
+		&for Z in [-1,1]
+			.unless ~&(X) ~ ~&(Z) #~:reactor_base run return fail
+	# 4 air sides
+	&for V in [-1,1]
+		.unless ~&(V) ~ ~ #:air run return fail
+		.unless ~ ~ ~&(V) #:air run return fail
+	# 4 air corners
+	&for X in [-1,1]
+		&for Z in [-1,1]
+			.unless ~&(X) ~1 ~&(Z) #:air run return fail
+	return 1
+function core/start
+	@s.item.components."minecraft:custom_model_data".strings = ["active"]
+	message({text: "Active!", color: yellow})
+
+	&del @s.data."nether_reactor:interact"
+	.pos ~ ~-0.501 ~ run kill @hitbox
+
+	&init %bossbar {text: "Nether Reactor"}
+	%bossbar%color = "blue"
+	%bossbar%max = 920
+	%bossbar = 0
+
+	@s#nether_reactor__step = 0
+	<night>.enabled = 1
+	spire()
+function core/reaction
+	@s#nether_reactor__step ++
+	%bossbar = @s#nether_reactor__step
+	# within the main room
+	.positioned ~-7.5 ~-1 ~-7.5
+		%bossbar%players = @a[dx=14,dy=3,dz=14]
+		.from @e[type=:zombified_piglin,dx=14,dy=3,dz=14] run anger()
+
+	# Reaction steps
+
+	# glowing obsidian replacing cobblestone
+	.if @s#nether_reactor__step == 40 =>
+		&for X in [-1,0,1] run .positioned ~&(X) ~-1 ~ run block/place(~:glowing_obsidian)
+		&for Z in [-1,1] run .positioned ~ ~-1 ~&(Z) run block/place(~:glowing_obsidian)
+	.if @s#nether_reactor__step == 60 =>
+		&for X in [-1,1]
+			&for Z in [-1,1]
+				.positioned ~&(X) ~ ~&(Z) run block/place(~:glowing_obsidian)
+	.if @s#nether_reactor__step == 80 =>
+		&for X in [-1,0,1] run .positioned ~&(X) ~1 ~ run block/place(~:glowing_obsidian)
+		&for Z in [-1,1] run .positioned ~ ~1 ~&(Z) run block/place(~:glowing_obsidian)
+	# gold is replaced
+	.if @s#nether_reactor__step == 140 =>
+		&for X in [-1,1]
+			&for Z in [-1,1]
+				.positioned ~&(X) ~-1 ~&(Z) run block/place(~:glowing_obsidian)
+	# item and mob spawns
+	.if @s#nether_reactor__step == 200 =>
+		%bossbar%color = "red"
+		core/spawn_items(15)
+		core/spawn_mobs(2)
+	.if @s#nether_reactor__step == 260 =>
+		core/spawn_items(15)
+		core/spawn_mobs(2)
+	.if @s#nether_reactor__step == 400 =>
+		core/spawn_items(15)
+		core/spawn_mobs(2)
+	.if @s#nether_reactor__step == 440 =>
+		drops := random value  0..35
+		core/spawn_items(drops)
+		core/spawn_mobs(1)
+	.if @s#nether_reactor__step == 500 =>
+		drops := random value  0..40
+		core/spawn_items(drops)
+		core/spawn_mobs(1)
+	.if @s#nether_reactor__step == 600 =>
+		drops := random value  0..32
+		core/spawn_items(drops)
+	.if @s#nether_reactor__step == 680 =>
+		drops := random value  0..20
+		core/spawn_items(drops)
+	.if @s#nether_reactor__step == 720 =>
+		drops := random value  0..24
+		core/spawn_items(drops)
+	.if @s#nether_reactor__step == 760 =>
+		drops := random value  0..36
+		core/spawn_items(drops)
+	.if @s#nether_reactor__step == 800 =>
+		drops := random value  0..20
+		core/spawn_items(drops)
+	# burning out of obsidian
+	.if @s#nether_reactor__step == 860 =>
+		%bossbar%color = "purple"
+		&var Y 1.5
+		&for X in [-1,0,1] for Z in [-1,0,1] run .pos ~&(X) ~&(Y) ~&(Z) run block/remove()
+		fill ~-1 ~1 ~-1 ~1 ~1 ~1 :obsidian
+	.if @s#nether_reactor__step == 880 =>
+		&var Y 0.5
+		&for X in [-1,0,1] for Z in [-1,1] run .pos ~&(X) ~&(Y) ~&(Z) run block/remove()
+		&for X in [0] for Z in [-1,1] run .pos ~&(X) ~&(Y) ~&(Z) run block/remove()
+		fill ~1 ~ ~1 ~1 ~ ~-1 :obsidian
+		fill ~-1 ~ ~1 ~-1 ~ ~-1 :obsidian
+		setblock ~ ~ ~1 :obsidian
+		setblock ~ ~ ~-1 :obsidian
+	.if @s#nether_reactor__step == 900 =>
+		&var Y -0.5
+		&for X in [-1,0,1] for Z in [-1,0,1] run .pos ~&(X) ~&(Y) ~&(Z) run block/remove()
+		fill ~-1 ~-1 ~-1 ~1 ~-1 ~1 :obsidian
+	# end of reaction
+	.if @s#nether_reactor__step >= 920 run core/end()
+function core/end
+	&del @s#nether_reactor__step
+	@s.item.components."minecraft:custom_model_data".strings = [dead]
+	&del %bossbar%players
+	.unless @reacting
+		&del %bossbar
+		remove_infinite_night()
+	# structure changes
+	fill ~-1 ~1 ~-1 ~1 ~1 ~1 :obsidian
+	fill ~1 ~ ~1 ~1 ~ ~-1 :obsidian
+	fill ~-1 ~ ~1 ~-1 ~ ~-1 :obsidian
+	setblock ~ ~ ~1 :obsidian
+	setblock ~ ~ ~-1 :obsidian
+	fill ~-1 ~-1 ~-1 ~1 ~-1 ~1 :obsidian
+	decay_spire()
+function core/break
+	&del %bossbar%players
+# Reaction functions
+function core/spawn_items(drops)
+	.if drops <= 0 run return 1
+	core/random_spot()
+	.at @spot run loot spawn ~~~ loot ~:rewards
+	kill @spot
+	drops--
+	.if drops > 0 run &recurse
+function core/spawn_mobs(mobCap)
+	mobCount = 0
+	.positioned ~-7.5 ~-1 ~-7.5
+		.as @e[type=:zombified_piglin,dx=14,dy=3,dz=14] run mobCount++
+	.if mobCount < 3 =>
+		core/spawn_mob()
+		mobCount ++
+		mobCap --
+		.if mobCount < 3 if mobCap > 0 run &recurse
+function core/spawn_mob
+	core/random_spot()
+	.at @spot run summon :zombified_piglin ~~~
+	kill @spot
+function core/random_spot
+	# distance of 3 - 7 blocks, 0.5 steps
+	distance := random value 6..14
+	distance ++
+	# angle up to 360 degrees, 5 deg steps
+	angle := random value 1..72
+
+	.positioned ~ ~-1 ~ rotated 0 0 =>
+		angle --
+		.if angle == 0 =>
+			distance --
+			.if distance == 0
+				summon :marker ~~~ {data>"nether_reactor:spot": true}
+			.if distance > 0
+				.positioned ^ ^ ^0.5 run &recurse
+		.if angle > 0
+			.rotated ~5 0 run &recurse
+
+	&del distance
+	&del angle
+loot_table rewards {
+	type: command
+	pools: [{
+		rolls: 1
+		entries: [
+			{type: :item, name: :red_mushroom, weight: 1}
+			{type: :item, name: :brown_mushroom, weight: 1}
+			{type: :item, name: :cactus, weight: 1}
 			{
-				"type": "minecraft:item", "weight": 1,
-				"name": "minecraft:quartz",
-				"functions": [
-					{"function": "minecraft:set_count", "count": 4}
+				type: :item, weight: 1
+				name: :quartz
+				functions: [
+					{function: :set_count, count: 4}
 				]
-			},
-			{"type": "minecraft:item", "name": "minecraft:sugar_cane", "weight": 1},
+			}
+			{type: :item, name: :sugar_cane, weight: 1}
 			{
-				"type": "minecraft:item", "weight": 1,
-				"name": "minecraft:glowstone_dust",
-				"functions": [
-					{"function": "minecraft:set_count", "count": 3}
+				type: :item, weight: 1
+				name: :glowstone_dust
+				functions: [
+					{function: :set_count, count: 3}
 				]
-			},
-			{"type": "minecraft:item", "name": "minecraft:pumpkin_seeds", "weight": 1},
-			{"type": "minecraft:item", "name": "minecraft:melon_seeds", "weight": 1}
+			}
+			{type: :item, name: :pumpkin_seeds, weight: 1}
+			{type: :item, name: :melon_seeds, weight: 1}
 		]
 	}]
 }
 
 
 # as pigman in main spire room during reaction
-function anger {
-	> unless @s.AngryAt {
-		> if @p[distance=..4] {
+function anger
+	.unless @s.AngryAt
+		.if @p[distance=..4,gamemode=!creative,gamemode=!spectator]
 			@s.AngerTime = 50
-			@s.AngryAt = @p[distance=..4].UUID
-		}
-	}
-}
+			@s.AngryAt = @p[distance=..4,gamemode=!creative,gamemode=!spectator].UUID
 
+import structure nether_spire from "nether_spire.nbt"
+function spire
+	setblock ~ ~-3 ~ :structure_block{mode:LOAD, powered:false, name:~:nether_spire, posX:-8, posY:0, posZ:-8}
+	setblock ~ ~-2 ~ :redstone_block
 
-function craft {
-	kill @iron
-	kill @s
-	loot spawn ~~~ loot ~:core
-	particle !:composter ~~~ 0.25 0.5 0.25 0.5 50 normal
-}
-
-structure nether_spire
-function spire {
-	setblock ~ ~-3 ~ minecraft:structure_block{mode:"LOAD",powered:0b,name:"~:nether_spire",posX:-8,posZ:-8}
-	setblock ~ ~-2 ~ !:redstone_block
-}
-
-function decay_spire {
+function decay_spire
 	# outer wall
-	.eval Height range(-1, 6)
-	.for Y in (Height) {
-		loot spawn ~-8 ~(Y) ~-8 loot ~:decay_rng
-	}
-	.eval Width range(-7, 9)
-	.for I in (Width) {
-		.eval H (I)/2 + 9
-		.eval H math.ceil((H))
-		.eval Height range(-1, (H)+1)
-		.for Y in (Height) {
-			loot spawn ~(I) ~(Y) ~-8 loot ~:decay_rng
-			loot spawn ~-8 ~(Y) ~(I) loot ~:decay_rng
-		}
-	}
-	.eval Width range(-7, 8)
-	.for I in (Width) {
-		.eval H (I)/2 + 17
-		.eval H math.floor((H))
-		.eval Height range(-1, (H)+1)
-		.for Y in (Height) {
-			loot spawn ~(I) ~(Y) ~8 loot ~:decay_rng
-			loot spawn ~8 ~(Y) ~(I) loot ~:decay_rng
-		}
-	}
-	.eval Height range(-1, 21)
-	.for Y in (Height) {
-		loot spawn ~8 ~(Y) ~8 loot ~:decay_rng
-	}
+	&for Y in -1..5
+		.pos ~-8 ~&(Y) ~-8 run decay()
+	&for I in -7..8
+		&var H (I+1)/2 + 9
+		&for Y in -1..H
+			.pos ~&(I) ~&(Y) ~-8 run decay()
+			.pos ~-8 ~&(Y) ~&(I) run decay()
+	&for I in -7..7
+		&var H I/2 + 17
+		&for Y in -1..H
+			.pos ~&(I) ~&(Y) ~8 run decay()
+			.pos ~8 ~&(Y) ~&(I) run decay()
+	&for Y in -1..20
+		.pos ~8 ~&(Y) ~8 run decay()
 
 	# middle wall
-	.eval Height range(5, 23)
-	.for Y in (Height) {
-		loot spawn ~-5 ~(Y) ~-5 loot ~:decay_rng
-	}
-	.eval Width range(-4, 6)
-	.for I in (Width) {
-		.eval H 20 - (I)/2
-		.eval H math.ceil((H))
-		.eval Height range(5, (H)+1)
-		.for Y in (Height) {
-			loot spawn ~(I) ~(Y) ~-5 loot ~:decay_rng
-			loot spawn ~-5 ~(Y) ~(I) loot ~:decay_rng
-		}
-	}
-	.eval Width range(-4, 1)
-	.for I in (Width) {
-		.eval H 16 - (I)/2
-		.eval H math.floor((H))
-		.eval Height range(5, (H)+1)
-		.for Y in (Height) {
-			loot spawn ~(I) ~(Y) ~5 loot ~:decay_rng
-			loot spawn ~5 ~(Y) ~(I) loot ~:decay_rng
-		}
-	}
-	.eval Width range(1, 5)
-	.for I in (Width) {
-		.eval H 15 + (I)/2
-		.eval H math.ceil((H))
-		.eval Height range(5, (H)+1)
-		.for Y in (Height) {
-			loot spawn ~(I) ~(Y) ~5 loot ~:decay_rng
-			loot spawn ~5 ~(Y) ~(I) loot ~:decay_rng
-		}
-	}
-	.eval Height range(5, 19)
-	.for Y in (Height) {
-		loot spawn ~5 ~(Y) ~5 loot ~:decay_rng
-	}
+	&for Y in 5..22
+		.pos ~-5 ~&(Y) ~-5 run decay()
+	&for I in -4..5
+		&var H 20 - I/2
+		&for Y in 5..H
+			.pos ~&(I) ~&(Y) ~-5 run decay()
+			.pos ~-5 ~&(Y) ~&(I) run decay()
+	&for I in -4..0
+		&var H 16 - (I+1)/2
+		&for Y in 5..H
+			.pos ~&(I) ~&(Y) ~5 run decay()
+			.pos ~5 ~&(Y) ~&(I) run decay()
+	&for I in 1..4
+		&var H 15 + (I+1)/2
+		&for Y in 5..H
+			.pos ~&(I) ~&(Y) ~5 run decay()
+			.pos ~5 ~&(Y) ~&(I) run decay()
+	&for Y in 5..18
+		.pos ~5 ~&(Y) ~5 run decay()
 
 	# inner wall
-	.eval Height range(11, 26)
-	.for Y in (Height) {
-		loot spawn ~-3 ~(Y) ~-3 loot ~:decay_rng
-	}
-	.eval Width range(-2, 4)
-	.for I in (Width) {
-		.eval H (I)/2 + 27
-		.eval H math.floor((H))
-		.eval Height range(11, (H)+1)
-		.for Y in (Height) {
-			loot spawn ~(I) ~(Y) ~-3 loot ~:decay_rng
-			loot spawn ~-3 ~(Y) ~(I) loot ~:decay_rng
-		}
-	}
-	.eval Width range(-2, 3)
-	.for I in (Width) {
-		.eval H (I)/2 + 29
-		.eval H math.ceil((H))
-		.eval Height range(11, (H)+1)
-		.for Y in (Height) {
-			loot spawn ~(I) ~(Y) ~3 loot ~:decay_rng
-			loot spawn ~3 ~(Y) ~(I) loot ~:decay_rng
-		}
-	}
-	.eval Height range(11, 31)
-	.for Y in (Height) {
-		loot spawn ~3 ~(Y) ~3 loot ~:decay_rng
-	}
+	&for Y in 11..25
+		.pos ~-3 ~&(Y) ~-3 run decay()
+	&for I in -2..3
+		&var H I/2 + 27
+		&for Y in 11..H
+			.pos ~&(I) ~&(Y) ~-3 run decay()
+			.pos ~-3 ~&(Y) ~&(I) run decay()
+	&for I in -2..2
+		&var H (I+1)/2 + 29
+		&for Y in 11..H
+			.pos ~&(I) ~&(Y) ~3 run decay()
+			.pos ~3 ~&(Y) ~&(I) run decay()
+	&for Y in 11..30
+		.pos ~3 ~&(Y) ~3 run decay()
+function decay
+	rng := random value 0..3
+	.if rng = 0 run setblock ~~~ :air
 
-	# decay at marked areas
-	> with @decayer run .lambda {
-		setblock ~~~ !:air replace
-		kill @s
-	}
-}
-loot decay_rng {
-	"type": "command",
-	"pools": [{
-		"conditions": [{
-			"condition": "minecraft:random_chance",
-			"chance": 0.25
-		}],
-		"rolls": 1,
-		"entries": [{
-			"type": "minecraft:item",
-			"name": "minecraft:netherrack",
-			"functions": [{
-				"function": "minecraft:set_nbt",
-				"tag": "{\"decayer\":true}"
-			}],
-			"weight": 1
-		}]
-	}]
-}
-
-function infinite_night {
-	> store result InfiniteNightTimer run time query daytime
-	> if InfiniteNightTimer >= 18000 if InfiniteNightTimer < 18150 run /time set midnight
-	> if InfiniteNightTimer < 18000 run time add 100
-	> if InfiniteNightTimer >= 18150 run time add 100
-}
-
-function rng100 {
-	loot spawn ~ 999 ~ loot ~:rng100
-	@rng = @item[distance=..1,nbt={Item:{tag:{rng:1b}}}]
-	RNG = 0
-	> positioned ~ 999 ~ as @rng run .lambda {
-		Temp = @s.Item.Count
-		RNG += Temp
-		kill @s
-	}
-	Temp reset
-}
-loot rng100 {
-	"type": "command",
-	"pools": [{
-		"rolls": 1,
-		"entries": [{
-			"type": "minecraft:item",
-			"name": "minecraft:dirt",
-			"functions": [
-				{
-					"function": "minecraft:set_count",
-					"count": {
-						"type": "uniform",
-						"min": 0, "max": 100
-					}
-				},
-				{
-					"function": "minecraft:set_nbt",
-					"tag": "{\"rng\":true}"
-				}
-			]
-		}]
-	}]
-}
-function rng takes RNG_Min RNG_Max {
-	.call rng100
-	RNG_Diff = RNG_Max
-	RNG_Diff -= RNG_Min
-	RNG_Scale = 100
-	RNG_Scale /= RNG_Diff
-	RNG /= RNG_Scale
-	RNG += RNG_Min
-	RNG < RNG_Max
-	RNG_Diff reset
-	RNG_Scale reset
-}
+function infinite_night
+	daytime := time query daytime
+	.if daytime >= 18000 if daytime < 18150 =>
+		.unless <night>.hadCycle
+			<night>.hadCycle := gamerule doDaylightCycle
+		gamerule doDaylightCycle false
+	.if daytime < 18000 run time add 100
+	.if daytime >= 18150 run time add 100
+function remove_infinite_night
+	.if <night>.{hadCycle:1}
+		gamerule doDaylightCycle true
+	&del <night>.hadCycle
+	&del <night>.enabled
