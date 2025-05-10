@@ -75,8 +75,6 @@ recipe core {
 	result>components: &(item_core)
 }
 
-tag block reactor_base append :cobblestone :cobbled_deepslate :blackstone
-
 
 function init
 	&init
@@ -157,16 +155,24 @@ function player/place_check
 	&del <item>.mainhand
 	&del <item>.offhand
 	&del <item>.used
+tag entity_type raytrace_ignores append :item :experience_orb :interaction :item_display :block_display :text_display
 function player/place_trace
 	raytrace = 500
+	tag @s add nether_reactor__raytracer
 	placed ?= .anchored eyes =>
 		raytrace--
 		.if raytrace <= 0
 			return fail
+		.pos ~-0.001 ~-0.001 ~-0.001 as @e[dx=0,dy=0,dz=0, type=!#~:raytrace_ignores, tag=!nether_reactor__raytracer]
+			.pos ~-0.998 ~-0.998 ~-0.998 if @s[dx=0,dy=0,dz=0]
+				return fail
 		.if ^ ^ ^0.01 #:replaceable positioned ^ ^ ^0.01
 			return run &recurse
+		.align xyz if @e[dx=0,dy=0,dz=0, type=!#~:raytrace_ignores]
+			return fail
 		block/place(<item>.used)
 		return 1
+	tag @s remove nether_reactor__raytracer
 	.if placed = true unless @s[gamemode=creative]
 		.if <item>.mainhand run item modify entity @s weapon.mainhand {function: :set_count, count: -1, add: true}
 		.if <item>.offhand  run item modify entity @s weapon.offhand  {function: :set_count, count: -1, add: true}
@@ -266,6 +272,7 @@ function core/activation_check
 		.if valid = false run message("Not the correct pattern!")
 	.unless y > 7 run message("The nether reactor needs to be built higher up.")
 	.unless y < 223 run message("The nether reactor needs to be built lower down.")
+tag block reactor_base append :cobblestone :cobbled_deepslate :blackstone
 function core/structure_check
 	# 4 gold corners
 	&for X in [-1,1]
