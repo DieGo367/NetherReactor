@@ -1,172 +1,140 @@
 description In-game splits for the Nether Reactor Core Challenge!
 icon speedrun.png
-
+format 71
 
 namespace minecraft
-tag functions load [nrcc:load]
-tag functions tick [nrcc:tick]
+tag function load append nrcc:load
+tag function tick append nrcc:tick
 
 namespace nrcc
-objective NRCCGlobal
 
-@runner = @a[tag=Runner]
-@armors = @e[type=!:armor_stand]
+alias @runner @a[tag=Runner]
 
-@blocks = @e[type=!:armor_stand,tag=GuiseBlock]
+alias @blocks @e[type=:item_display,nbt={data>"nether_reactor:block":1b}]
 
-macro set_msg takes msg run $time_printer.PreMsg = (msg)
-enum BAR CHAT TITLE
+var Dimensions [
+	{id: :overworld,  name: "The Overworld", color: green}
+	{id: :the_nether, name: "The Nether",    color: red}
+	{id: :the_end,    name: "The End",       color: dark_purple}
+]
 
-define core 501
-define core_active 502
-define core_dead 503
-
-define Dimensions [!:overworld, !:the_nether, !:the_end]
-define DimIDs [0, 1, 2]
-define DimNames ["Overworld", "Nether", "End"]
-define DimColors ["green", "red", "dark_purple"]
-
-function load {
-	.score
-	.scoredelete Splits
-	.score Splits
-	.score Health health
-	# scoreboard objectives setdisplay sidebar Splits
+function load
+	&init
+	scoreboard objectives remove nrcc__splits
+	&init nrcc__splits
+	&init nrcc__health health
+	# scoreboard objectives setdisplay sidebar nrcc__splits
 
 	tag @a remove Runner
 
 	# UI
-	.define startButton {
-		"text": "[Start]",
-		"color": "green",
-		"clickEvent": {
-			"action": "run_command",
-			"value": "/function ~:start"
-		},
-		"hoverEvent": {
-			"action": "show_text",
-			"contents": {
-				"text": "Click to start the run!"
-			}
+	tellraw @a {
+		text: "[Start]"
+		color: green
+		click_event: {
+			action: "run_command"
+			command: "/function nrcc:start"
+		}
+		hover_event: {
+			action: show_text
+			value: "Click to start the run!"
 		}
 	}
-	tellraw @a (startButton)
-}
-function tick {
-	> with @runner run .lambda {
+
+function tick
+	.from @runner =>
 		# Increase timer
-		Time/Splits ++
+		Time#nrcc__splits ++
 
 		# Countdown titles
-		> if Time/Splits == -60 run title @s title {"text":"3"}
-		> if Time/Splits == -40 run title @s title {"text":"2"}
-		> if Time/Splits == -20 run title @s title {"text":"1"}
-		> if Time/Splits == 0 run title @s title {"text":"GO!","color":"gold"}
+		.if Time#nrcc__splits == -60 run title @s title {text: "3"}
+		.if Time#nrcc__splits == -40 run title @s title {text: "2"}
+		.if Time#nrcc__splits == -20 run title @s title {text: "1"}
+		.if Time#nrcc__splits == 0 run title @s title {text: "GO!",color: gold}
 
 		# in run
-		> if Time/Splits >= 0 run .lambda {
+		.if Time#nrcc__splits >= 0 =>
 			# print timer
-			.call print_time Time/Splits (BAR)
+			print_time(Time#nrcc__splits, "actionbar")
 
 			# Dimension check
-			.call check_dim
-			Temp = CurrDim
-			Temp -= LastDim
-			> unless Temp == 0 run .lambda {
-				KnownDim = 0
-				.for ID in (DimIDs) {
-					> if CurrDim == (ID) {
-						.macro set_msg "{\"text\": \"The ((DimNames[(ID)]))\", \"color\": \"((DimColors[(ID)]))\"}"
-						KnownDim = 1
-					}
-				}
-				> if KnownDim == 0 run .macro set_msg "{\"text\": \"Custom Dimension\", \"color\": \"gray\"}"
-				LastDim = CurrDim
-				.call split
-			}
-			Temp reset
+			check_dim()
+			.if <dimension>.{changed: 1} =>
+				&for dim in Dimensions
+					.if <dimension>.{current: &(dim.id)}
+						<time_printer>.PreMsg = {text: &(dim.name), color: &(dim.color)}
+				.unless <dimension>.current run <time_printer>.PreMsg = {text: "Custom Dimension", color: gray}
+				split()
+			&del Temp
 
 			# Item check
-			> if HasCore == 0 {
-				> if @s[nbt={Inventory:[{tag:{CustomModelData:(core)}}]}] run .lambda {
-					.macro set_msg "{\"text\": \"Core get\"}"
-					.call split
-					HasCore = 1
-				}
-			}
+			.unless <progress>.hasCore
+				.if @s[nbt={Inventory:[
+					{components>"minecraft:custom_data">"nether_reactor:block_id": nether_reactor:nether_reactor_core}
+				]}] =>
+					<time_printer>.PreMsg = {text: "Core get"}
+					split()
+					<progress>.hasCore = true
 
 			# Activation check
-			> if Activated == 0 {
-				> if @blocks[nbt={ArmorItems:[{tag:{CustomModelData:(core_active)}}]}] run .lambda {
-					.macro set_msg "{\"text\": \"Activated\"}"
-					.call split
-					Activated = 1
-				}
-			}
+			.unless <progress>.activated
+				.if @blocks[scores={nether_reactor__step=0..}] =>
+					<time_printer>.PreMsg = {text: "Activated"}
+					split()
+					<progress>.activated = true
 
 			# Death check
-			> if Activated == 1 {
-				> if @s/Health == 0 run .lambda {
-					title @s title {"text": "You failed...", "color": "red"}
-					.macro set_msg "{\"text\": \"Failed\", \"color\": \"red\"}"
-					.call print_time Time/Splits (CHAT)
-					.call stop
-				}
-			}
+			.if <progress>.activated if @s#nrcc__health == 0 =>
+				title @s title {text: "You failed...", color: red}
+				<time_printer>.PreMsg = {text: "Failed", color: red}
+				print_time(Time#nrcc__splits, "chat")
+				stop()
 
 			# Finish check
-			> if @blocks[nbt={ArmorItems:[{tag:{CustomModelData:(core_dead)}}]}] run .lambda {
-				title @s title {"text": "Time!","color": "gold"}
-				.macro set_msg "{\"text\": \"Time!\",\"color\": \"gold\"}"
-				.call print_time Time/Splits (CHAT)
-				.call stop
-			}
-		}
-	}
-}
+			.if @blocks[nbt={item>components>"minecraft:custom_model_data">strings:[dead]}] =>
+				title @s title {text: "Time!", color: "gold"}
+				<time_printer>.PreMsg = {"text": "Time!", color: gold}
+				print_time(Time#nrcc__splits, "chat")
+				stop()
 
-function start {
+function start
 	tag @a remove Runner
 	tag @s add Runner
 
-	effect give @s !:slowness 3 255
-	effect give @s !:mining_fatigue 3 255
+	effect give @s :slowness 3 255
+	effect give @s :mining_fatigue 3 255
 	
-	.scoredelete Splits
-	.score Splits
-	# scoreboard objectives setdisplay sidebar Splits
-	Time/Splits = -61
+	scoreboard objectives remove nrcc__splits
+	&init nrcc__splits
+	# scoreboard objectives setdisplay sidebar nrcc__splits
+	Time#nrcc__splits = -61
 	SplitCount = 0
-	.call check_dim
-	LastDim = CurrDim
-	HasCore = 0
-	Activated = 0
-	WarnLoc/NetherReactorVar = (CHAT)
-}
+	check_dim()
+	&del <progress>.hasCore
+	&del <progress>.activated
+	<nether_reactor:warn>.loc = "chat"
 
-function stop {
+function stop
 	tag @a remove Runner
-	WarnLoc/NetherReactorVar = (BAR)
-}
+	<nether_reactor:warn>.loc = "actionbar"
 
-function check_dim {
-	.for Dim in (Dimensions) index i {
-		> in (Dim) as @p[distance=..0] run CurrDim = (i)
-	}
-}
+function check_dim
+	<dimension>.previous = <dimension>.current
+	&del <dimension>.current
+	&for dim in Dimensions
+		.if in &(dim.id) as @s[distance=..0] run <dimension>.current = &(dim.id)
+	<dimension>.temp = <dimension>.previous
+	<dimension>.changed ?= <dimension>.temp = <dimension>.current
+	&del <dimension>.temp
 
-function split {
+function split
 	SplitCount ++
-	.eval SplitNums range(0, 1001)
-	.for N in (SplitNums) {
-		> if SplitCount == (N) {
-			scoreboard players operation (N): Splits = Time Splits
-		}
-	}
-	.call print_time Time/Splits (CHAT)
-}
+	&for N in 0..1000
+		.if SplitCount == &(N)
+			scoreboard players operation &(N): nrcc__splits = Time nrcc__splits
+	print_time(Time#nrcc__splits, "chat")
 
-function calc_time takes Value {
+function calc_time(Value)
 	# Get minutes
 	Minutes = Value
 	Scalar = 1200
@@ -185,51 +153,49 @@ function calc_time takes Value {
 	Scalar = 5
 	Value *= Scalar
 	# cleanup
-	Scalar reset
-	Subtractor reset
-}
-function print_time takes Value PrintLoc {
-	.do calc_time
+	&del Scalar
+	&del Subtractor
+
+function print_time(Value, <time_printer>.loc)
+	calc_time(Value)
 
 	# update suffixes
-	> if Seconds < 10 run $time_printer.SecMark = ":0"
-	> unless Seconds < 10 run $time_printer.SecMark = ":"
-	> if Value < 10 run $time_printer.SubSecMark = ":0"
-	> unless Value < 10 run $time_printer.SubSecMark = ":"
-	> if $time_printer.PreMsg run $time_printer.PreMsgMark = ": "
-	> unless $time_printer.PreMsg {
-		$time_printer.PreMsgMark = ""
-		$time_printer.PreMsg = ""
-	}
+	.if Seconds < 10 run <time_printer>.SecMark = ":0"
+	.unless Seconds < 10 run <time_printer>.SecMark = ":"
+	.if Value < 10 run <time_printer>.SubSecMark = ":0"
+	.unless Value < 10 run <time_printer>.SubSecMark = ":"
+	.if <time_printer>.PreMsg run <time_printer>.PreMsgMark = ": "
+	.unless <time_printer>.PreMsg
+		<time_printer>.PreMsgMark = ""
+		<time_printer>.PreMsg = ""
 
-	.define timeText {
-		"text": "",
-		"color": "aqua",
-		"extra": [
-			{"storage": "~:time_printer", "nbt": "PreMsg", "interpret": true},
-			{"storage": "~:time_printer", "nbt": "PreMsgMark"},
-			{"score": {
-				"name": "Minutes",
-				"objective": "NRCCGlobal"
+	&var timeText {
+		text: "",
+		color: aqua,
+		extra: [
+			{storage: ~:time_printer, nbt: "PreMsg", interpret: true},
+			{storage: ~:time_printer, nbt: "PreMsgMark"},
+			{score: {
+				name: "Minutes",
+				objective: "nrcc"
 			}},
-			{"storage": "~:time_printer", "nbt": "SecMark"},
-			{"score": {
-				"name": "Seconds",
-				"objective": "NRCCGlobal"
+			{storage: ~:time_printer, nbt: "SecMark"},
+			{score: {
+				name: "Seconds",
+				objective: "nrcc"
 			}},
-			{"storage": "~:time_printer", "nbt": "SubSecMark"},
-			{"score":{
-				"name": "Value",
-				"objective": "NRCCGlobal"
+			{storage: ~:time_printer, nbt: "SubSecMark"},
+			{score: {
+				name: "Value",
+				objective: "nrcc"
 			}}
 		]
 	}
 
 	# print
-	> if PrintLoc == (BAR) run title @s actionbar (timeText)
-	> if PrintLoc == (TITLE) run title @s title (timeText)
-	> if PrintLoc == (CHAT) run tellraw @s (timeText)
+	.if <time_printer>.{loc: "actionbar"} run title @s actionbar &(timeText)
+	.if <time_printer>.{loc: "title"} run title @s title &(timeText)
+	.if <time_printer>.{loc: "chat"} run tellraw @s &(timeText)
 
 	# cleanup
-	$time_printer.PreMsg remove
-}
+	&del <time_printer>.PreMsg

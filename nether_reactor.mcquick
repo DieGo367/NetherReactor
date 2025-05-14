@@ -1,5 +1,6 @@
 description Adds the Nether Reactor from early MCPE. By DVdo
 icon nether_reactor.png
+format 71
 
 namespace minecraft
 tag function load append nether_reactor:init
@@ -18,8 +19,6 @@ alias @hitbox @n[type=:interaction,nbt={data>"nether_reactor:hitbox":1b},distanc
 
 alias @reacting @blocks[scores={nether_reactor__step=0..}]
 alias @spot @n[type=:marker,nbt={data>"nether_reactor:spot":1b}]
-
-enum BAR CHAT TITLE
 
 var item_core {
 	"minecraft:item_name": "Nether Reactor Core"
