@@ -271,7 +271,7 @@ function is_void
 function core/activation_check
 	.pos ~ ~-8 ~ if is_void() run return run =>
 		message("The Nether reactor needs to be built higher up.")
-	.pos ~ ~33 ~ if is_void() run return run =>
+	.pos ~ ~30 ~ if is_void() run return run =>
 		message("The Nether reactor needs to be built lower down.")
 	.unless core/structure_check() run return run =>
 		message("Not the correct pattern!")
