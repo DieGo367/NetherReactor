@@ -253,7 +253,7 @@ function block/broken
 		<drop> $=> $loot spawn ~~~ loot $(id)
 	
 	.if @s[nbt={item>components>"minecraft:custom_data">"nether_reactor:block_id":~:nether_reactor_core}]
-		core/break()
+		core/remove_bossbar()
 function block/interacted
 	.if @s[nbt={item>components>"minecraft:custom_data">"nether_reactor:block_id":~:nether_reactor_core}]
 		core/activation_check()
@@ -301,6 +301,14 @@ function core/structure_check
 		&for Z in [-1,1]
 			.unless ~&(X) ~1 ~&(Z) #:air run return fail
 	return 1
+function core/get_bossbar
+	<bossbar>.a = @s.UUID[0]
+	<bossbar>.b = @s.UUID[1]
+	<bossbar>.c = @s.UUID[2]
+	<bossbar>.d = @s.UUID[3]
+function core/remove_bossbar
+	core/get_bossbar()
+	<bossbar> $=> $bossbar remove nether_reactor:$(a)_$(b)_$(c)_$(d)
 function core/start
 	@s.item.components."minecraft:custom_model_data".strings = ["active"]
 	message({text: "Active!", color: yellow})
@@ -308,20 +316,22 @@ function core/start
 	&del @s.data."nether_reactor:interact"
 	.pos ~ ~-0.501 ~ run kill @hitbox
 
-	&init %bossbar {text: "Nether Reactor"}
-	%bossbar%color = "blue"
-	%bossbar%max = 920
-	%bossbar = 0
+	core/get_bossbar()
+	<bossbar> $=>
+		$bossbar add nether_reactor:$(a)_$(b)_$(c)_$(d) {text:"Nether Reactor"}
+		$bossbar set nether_reactor:$(a)_$(b)_$(c)_$(d) color blue
+		$bossbar set nether_reactor:$(a)_$(b)_$(c)_$(d) max 920
 
 	@s#nether_reactor__step = 0
 	<night>.enabled = 1
 	spire()
 function core/reaction
 	@s#nether_reactor__step ++
-	%bossbar = @s#nether_reactor__step
-	# within the main room
+	core/get_bossbar()
+	<bossbar> $=>
+		$execute store result bossbar nether_reactor:$(a)_$(b)_$(c)_$(d) value run scoreboard players get @s nether_reactor__step
+		$execute positioned ~-7.5 ~-1 ~-7.5 run bossbar set nether_reactor:$(a)_$(b)_$(c)_$(d) players @a[dx=14,dy=3,dz=14]
 	.positioned ~-7.5 ~-1 ~-7.5
-		%bossbar%players = @a[dx=14,dy=3,dz=14]
 		.from @e[type=:zombified_piglin,dx=14,dy=3,dz=14] run anger()
 
 	# Reaction steps
@@ -344,7 +354,7 @@ function core/reaction
 				.positioned ~&(X) ~-1 ~&(Z) run block/place(~:glowing_obsidian)
 	# item and mob spawns
 	.if @s#nether_reactor__step == 200 =>
-		%bossbar%color = "red"
+		<bossbar> $=> $bossbar set nether_reactor:$(a)_$(b)_$(c)_$(d) color red
 		core/spawn_items(15)
 		core/spawn_mobs(2)
 	.if @s#nether_reactor__step == 260 =>
@@ -378,7 +388,7 @@ function core/reaction
 		core/spawn_items(drops)
 	# burning out of obsidian
 	.if @s#nether_reactor__step == 860 =>
-		%bossbar%color = "purple"
+		<bossbar> $=> $bossbar set nether_reactor:$(a)_$(b)_$(c)_$(d) color purple
 		&var Y 1.5
 		&for X in [-1,0,1] for Z in [-1,0,1] run .pos ~&(X) ~&(Y) ~&(Z) run block/remove()
 		fill ~-1 ~1 ~-1 ~1 ~1 ~1 :obsidian
@@ -399,10 +409,8 @@ function core/reaction
 function core/end
 	&del @s#nether_reactor__step
 	@s.item.components."minecraft:custom_model_data".strings = [dead]
-	&del %bossbar%players
-	.unless @reacting
-		&del %bossbar
-		remove_infinite_night()
+	core/remove_bossbar()
+	.unless @reacting run remove_infinite_night()
 	# structure changes
 	fill ~-1 ~1 ~-1 ~1 ~1 ~1 :obsidian
 	fill ~1 ~ ~1 ~1 ~ ~-1 :obsidian
@@ -411,8 +419,6 @@ function core/end
 	setblock ~ ~ ~-1 :obsidian
 	fill ~-1 ~-1 ~-1 ~1 ~-1 ~1 :obsidian
 	decay_spire()
-function core/break
-	&del %bossbar%players
 # Reaction functions
 function core/spawn_items(drops)
 	.if drops <= 0 run return 1
