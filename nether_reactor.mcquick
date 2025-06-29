@@ -1,6 +1,6 @@
 description Adds the Nether Reactor from early MCPE. By DVdo
 icon nether_reactor.png
-format 80
+format 81
 
 namespace minecraft
 tag function load append nether_reactor:init
