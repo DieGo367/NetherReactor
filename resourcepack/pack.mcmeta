@@ -1,6 +1,9 @@
 {
 	"pack": {
-		"pack_format": 64,
+		"pack_format": 55,
+		"min_format": 55,
+		"max_format": 69,
+		"supported_formats": [55, 69],
 		"description": "Textures for the Nether Reactor datapack. By DVdo"
 	}
 }
