@@ -160,7 +160,7 @@ function player/place_trace
 	raytrace = 500
 	tag @s add nether_reactor__raytracer
 	placed ?= .anchored eyes =>
-		raytrace--
+		raytrace --
 		.if raytrace <= 0
 			return fail
 		.pos ~-0.001 ~-0.001 ~-0.001 as @e[dx=0,dy=0,dz=0, type=!#~:raytrace_ignores, tag=!nether_reactor__raytracer]
@@ -184,7 +184,7 @@ function player/sees_block
 			.if @b[distance=..0.7] =>
 				raytrace = 500
 				.at @s anchored eyes =>
-					raytrace--
+					raytrace --
 					.if raytrace <= 0
 						return fail
 					.if ^ ^ ^0.01 #:replaceable positioned ^ ^ ^0.01
@@ -426,12 +426,12 @@ function core/spawn_items(drops)
 	core/random_spot()
 	.at @spot run loot spawn ~~~ loot ~:rewards
 	kill @spot
-	drops--
+	drops --
 	.if drops > 0 run &recurse
 function core/spawn_mobs(mobCap)
 	mobCount = 0
 	.positioned ~-7.5 ~-1 ~-7.5
-		.as @e[type=:zombified_piglin,dx=14,dy=3,dz=14] run mobCount++
+		.as @e[type=:zombified_piglin,dx=14,dy=3,dz=14] run mobCount ++
 	.if mobCount < 3 =>
 		core/spawn_mob()
 		mobCount ++
