@@ -1,7 +1,7 @@
-description Adds the Nether Reactor from early MCPE. By DVdo
-icon nether_reactor.png
+description "Adds the Nether Reactor from early MCPE. By DVdo"
+icon "nether_reactor.png"
 min_format 71
-max_format 88
+max_format 94
 
 namespace minecraft
 tag function load append nether_reactor:init
@@ -497,6 +497,12 @@ function anger
 		.if @p[distance=..4,gamemode=!creative,gamemode=!spectator]
 			@s.AngerTime = 50
 			@s.AngryAt = @p[distance=..4,gamemode=!creative,gamemode=!spectator].UUID
+overlay 89
+	function anger
+		.unless @s.angry_at
+			.if @p[distance=..4,gamemode=!creative,gamemode=!spectator]
+				@s.anger_end_time = 50
+				@s.angry_at = @p[distance=..4,gamemode=!creative,gamemode=!spectator].UUID
 
 import structure nether_spire from "nether_spire.nbt"
 function spire
@@ -560,16 +566,21 @@ function decay
 	rng := random value 0..3
 	.if rng = 0 run setblock ~~~ :air
 
+var dayCycleRule "doDaylightCycle"
 function infinite_night
+	&overlay 92
+		&var dayCycleRule "advance_time"
 	daytime := time query daytime
 	.if daytime >= 18000 if daytime < 18150 =>
 		.unless <night>.hadCycle
-			<night>.hadCycle := gamerule doDaylightCycle
-		gamerule doDaylightCycle false
+			<night>.hadCycle := gamerule &(dayCycleRule)
+		gamerule &(dayCycleRule) false
 	.if daytime < 18000 run time add 100
 	.if daytime >= 18150 run time add 100
 function remove_infinite_night
+	&overlay 92
+		&var dayCycleRule "advance_time"
 	.if <night>.{hadCycle:1}
-		gamerule doDaylightCycle true
+		gamerule &(dayCycleRule) true
 	&del <night>.hadCycle
 	&del <night>.enabled
