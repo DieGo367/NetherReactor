@@ -1,7 +1,7 @@
 description "Adds the Nether Reactor from early MCPE. By DVdo"
 icon "nether_reactor.png"
 min_format 71
-max_format 94
+max_format 101
 
 namespace minecraft
 tag function load append nether_reactor:init
@@ -173,9 +173,14 @@ function player/place_trace
 		block/place(<item>.used)
 		return 1
 	tag @s remove nether_reactor__raytracer
-	.if placed = true unless @s[gamemode=creative]
-		.if <item>.mainhand run item modify entity @s weapon.mainhand {function: :set_count, count: -1, add: true}
-		.if <item>.offhand  run item modify entity @s weapon.offhand  {function: :set_count, count: -1, add: true}
+	.if placed = true
+		playsound :block.stone.place block @s
+		&overlay 95
+			.if <item>.mainhand run swing @s mainhand
+			.if <item>.offhand run swing @s offhand
+		.unless @s[gamemode=creative]
+			.if <item>.mainhand run item modify entity @s weapon.mainhand {function: :set_count, count: -1, add: true}
+			.if <item>.offhand  run item modify entity @s weapon.offhand  {function: :set_count, count: -1, add: true}
 function player/sees_block
 	&alias @b @block[tag=nether_reactor__track]
 	# at tagged block
@@ -324,7 +329,8 @@ function core/start
 		$bossbar set nether_reactor:$(a)_$(b)_$(c)_$(d) max 920
 
 	@s#nether_reactor__step = 0
-	<night>.enabled = 1
+	.if in :overworld
+		<night>.enabled = 1
 	spire()
 function core/reaction
 	@s#nether_reactor__step ++
@@ -411,7 +417,7 @@ function core/end
 	&del @s#nether_reactor__step
 	@s.item.components."minecraft:custom_model_data".strings = [dead]
 	core/remove_bossbar()
-	.unless @reacting run remove_infinite_night()
+	.if in :overworld unless @reacting run remove_infinite_night()
 	# structure changes
 	fill ~-1 ~1 ~-1 ~1 ~1 ~1 :obsidian
 	fill ~1 ~ ~1 ~1 ~ ~-1 :obsidian
@@ -577,6 +583,15 @@ function infinite_night
 		gamerule &(dayCycleRule) false
 	.if daytime < 18000 run time add 100
 	.if daytime >= 18150 run time add 100
+overlay 97
+	function infinite_night
+		daytime := time of :overworld query :day
+		.if daytime >= 18000 if daytime < 18150
+			time of :overworld rate 1
+			time of :overworld pause
+			return 1
+		time of :overworld rate 100
+		time of :overworld resume
 function remove_infinite_night
 	&overlay 92
 		&var dayCycleRule "advance_time"
@@ -584,3 +599,5 @@ function remove_infinite_night
 		gamerule &(dayCycleRule) true
 	&del <night>.hadCycle
 	&del <night>.enabled
+	&overlay 97
+		time of :overworld resume
