@@ -1,7 +1,7 @@
 description "Adds the Nether Reactor from early MCPE. By DVdo"
 icon "nether_reactor.png"
 min_format 71
-max_format 101
+max_format 107
 
 namespace minecraft
 tag function load append nether_reactor:init
@@ -143,6 +143,12 @@ predicate player/holding_shift {
 		input>sneak: true
 	}
 }
+overlay 102
+	predicate player/holding_shift {
+		condition: entity_properties
+		entity: this
+		predicate>"type_specific/player">input>sneak: true
+	}
 function player/place_check
 	<item>.mainhand = @s.SelectedItem.components."minecraft:custom_data"."nether_reactor:block_id"
 	.unless <item>.mainhand unless ~:player/mainhand_has_use?
