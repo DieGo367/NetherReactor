@@ -74,6 +74,13 @@ recipe core {
 	result>id: :warped_fungus_on_a_stick
 	result>components: &(item_core)
 }
+advancement learn_core {
+	criteria>got_diamond: {
+		trigger: inventory_changed
+		conditions>items: [{items: :diamond}]
+	}
+	rewards>recipes: [~:core]
+}
 
 
 function init
