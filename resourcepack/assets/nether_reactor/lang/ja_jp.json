@@ -1,0 +1,9 @@
+{
+	"block.nether_reactor.title": "ネザーリアクター",
+	"block.nether_reactor.core": "ネザーリアクターコア",
+	"block.nether_reactor.core.tooLow": "もっと高い場所にネザーリアクターを建ててください",
+	"block.nether_reactor.core.tooHigh": "もっと低い場所にネザーリアクターを建ててください",
+	"block.nether_reactor.core.wrongPattern": "パターンが間違っています!",
+	"block.nether_reactor.core.active": "起動!",
+	"block.nether_reactor.glowing_obsidian": "光る黒曜石"
+}

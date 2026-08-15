@@ -1,0 +1,9 @@
+{
+	"block.nether_reactor.title": "下界反應",
+	"block.nether_reactor.core": "下界反應核",
+	"block.nether_reactor.core.tooLow": "需要將下界反應器建構得更高一些。",
+	"block.nether_reactor.core.tooHigh": "需要將下界反應器建構得更低一些。",
+	"block.nether_reactor.core.wrongPattern": "模式不正確！",
+	"block.nether_reactor.core.active": "啟動！",
+	"block.nether_reactor.glowing_obsidian": "發光的黑曜石"
+}

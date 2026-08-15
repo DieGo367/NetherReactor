@@ -1,0 +1,9 @@
+{
+	"block.nether_reactor.title": "Netherreaktor",
+	"block.nether_reactor.core": "Netherreaktorkern",
+	"block.nether_reactor.core.tooLow": "Der Netherreaktor muss weiter oben gebaut werden.",
+	"block.nether_reactor.core.tooHigh": "Der Netherreaktor muss weiter unten gebaut werden.",
+	"block.nether_reactor.core.wrongPattern": "Muster nicht korrekt!",
+	"block.nether_reactor.core.active": "Aktiv!",
+	"block.nether_reactor.glowing_obsidian": "Leuchtender Obsidian"
+}

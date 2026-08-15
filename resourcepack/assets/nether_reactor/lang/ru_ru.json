@@ -1,0 +1,9 @@
+{
+	"block.nether_reactor.title": "Адский реактор",
+	"block.nether_reactor.core": "Ядро адского реактора",
+	"block.nether_reactor.core.tooLow": "Адский реактор надо построить выше.",
+	"block.nether_reactor.core.tooHigh": "Адский реактор надо построить ниже.",
+	"block.nether_reactor.core.wrongPattern": "Неправильный шаблон!",
+	"block.nether_reactor.core.active": "Действует!",
+	"block.nether_reactor.glowing_obsidian": "Пылающий обсидиан"
+}

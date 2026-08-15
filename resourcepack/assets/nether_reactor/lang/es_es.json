@@ -1,0 +1,9 @@
+{
+	"block.nether_reactor.title": "Infrarreactor",
+	"block.nether_reactor.core": "Núcleo del infrarreactor",
+	"block.nether_reactor.core.tooLow": "El infrarreactor debe construirse más arriba.",
+	"block.nether_reactor.core.tooHigh": "El infrarreactor debe construirse más abajo.",
+	"block.nether_reactor.core.wrongPattern": "¡Patrón incorrecto!",
+	"block.nether_reactor.core.active": "¡Activo!",
+	"block.nether_reactor.glowing_obsidian": "Obsidiana luminosa"
+}

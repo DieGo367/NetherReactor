@@ -1,0 +1,9 @@
+{
+	"block.nether_reactor.title": "네더 반응기",
+	"block.nether_reactor.core": "네더 반응기 코어",
+	"block.nether_reactor.core.tooLow": "네더 반응기는 더 높은 곳에 설치해야 합니다.",
+	"block.nether_reactor.core.tooHigh": "네더 반응기는 더 낮은 곳에 설치해야 합니다.",
+	"block.nether_reactor.core.wrongPattern": "올바른 패턴이 아닙니다!",
+	"block.nether_reactor.core.active": "활성화!",
+	"block.nether_reactor.glowing_obsidian": "빛나는 흑요석"
+}

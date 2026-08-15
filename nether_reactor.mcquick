@@ -22,14 +22,14 @@ alias @reacting @blocks[scores={nether_reactor__step=0..}]
 alias @spot @n[type=:marker,nbt={data>"nether_reactor:spot":1b}]
 
 var item_core {
-	"minecraft:item_name": "Nether Reactor Core"
+	"minecraft:item_name": {translate: block.nether_reactor.core, fallback: "Nether Reactor Core"}
 	"minecraft:item_model": ~:nether_reactor_core
 	"minecraft:max_stack_size": 64
 	"!minecraft:max_damage": {}
 	"minecraft:custom_data">"nether_reactor:block_id": ~:nether_reactor_core
 }
 var item_glowing_obsidian {
-	"minecraft:item_name": "Glowing Obsidian"
+	"minecraft:item_name": {translate: block.nether_reactor.glowing_obsidian, fallback: "Glowing Obsidian"}
 	"minecraft:item_model": ~:glowing_obsidian
 	"minecraft:max_stack_size": 64
 	"!minecraft:max_damage": {}
@@ -289,11 +289,11 @@ function is_void
 
 function core/activation_check
 	.pos ~ ~-8 ~ if is_void() run return run =>
-		message("The Nether reactor needs to be built higher up.")
+		message({translate: block.nether_reactor.core.tooLow, fallback: "The Nether reactor needs to be built higher up."})
 	.pos ~ ~30 ~ if is_void() run return run =>
-		message("The Nether reactor needs to be built lower down.")
+		message({translate: block.nether_reactor.core.tooHigh, fallback: "The Nether reactor needs to be built lower down."})
 	.unless core/structure_check() run return run =>
-		message("Not the correct pattern!")
+		message({translate: block.nether_reactor.core.wrongPattern, fallback: "Not the correct pattern!"})
 	core/start()
 tag block reactor_base append :cobblestone :cobbled_deepslate :blackstone
 function core/structure_check
@@ -330,14 +330,14 @@ function core/remove_bossbar
 	<bossbar> $=> $bossbar remove nether_reactor:$(a)_$(b)_$(c)_$(d)
 function core/start
 	@s.item.components."minecraft:custom_model_data".strings = ["active"]
-	message({text: "Active!", color: yellow})
+	message({translate: block.nether_reactor.core.active, fallback: "Active!", color: yellow})
 
 	&del @s.data."nether_reactor:interact"
 	.pos ~ ~-0.501 ~ run kill @hitbox
 
 	core/get_bossbar()
 	<bossbar> $=>
-		$bossbar add nether_reactor:$(a)_$(b)_$(c)_$(d) {text:"Nether Reactor"}
+		$bossbar add nether_reactor:$(a)_$(b)_$(c)_$(d) {translate: block.nether_reactor.title, fallback:"Nether Reactor"}
 		$bossbar set nether_reactor:$(a)_$(b)_$(c)_$(d) color blue
 		$bossbar set nether_reactor:$(a)_$(b)_$(c)_$(d) max 920
 
